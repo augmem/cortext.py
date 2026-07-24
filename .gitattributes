@@ -1,0 +1,9 @@
+# Keep natives and model shards byte-identical (checksums on materialize).
+*.so              binary
+*.dylib           binary
+*.dll             binary
+*.part-*          binary
+*.gguf            binary
+cortext/native/** -text
+cortext/models/** -text
+cortext/models/mdbr-leaf-ir/vocab.txt binary

@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.cortext-assets/
+*.gguf
+
+# Prebuilt shared libraries exceed GitHub's 100 MiB file limit (~140 MiB each
+# with embedded AIST). CI and maintainers vendor them from augmem/cortext
+# releases via scripts/vendor_release_assets.py — not from this git tree.
+cortext/native/**/*.so
+cortext/native/**/*.dylib
+cortext/native/**/*.dll
+
+# Local wheelhouses / caches
+wheelhouse/
+*.whl

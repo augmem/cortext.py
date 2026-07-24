@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package + test deps
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e ".[dev]" 2>/dev/null || python -m pip install -e .
+          python -m pip install pytest build wheel
+
+      - name: Vendor host natives + models from augmem/cortext
+        env:
+          # public assets; token only for higher rate limits
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VER="$(python -c "import re,pathlib; t=pathlib.Path('pyproject.toml').read_text(); m=re.search(r'version\\s*=\\s*\\\"([^\\\"]+)\\\"', t); print(m.group(1))")"
+          # Prefer matching engine tag; fall back to v1.2.4 if pin differs
+          python scripts/vendor_release_assets.py --from-release "v${VER}" --force \
+            || python scripts/vendor_release_assets.py --from-release v1.2.4 --force
+          test -f cortext/models/manifest.json
+          python - <<'PY'
+          from cortext.assets import package_assets_ready, platform_tag, host_library_path, PACKAGE_DIR
+          assert package_assets_ready(), (platform_tag(), host_library_path(PACKAGE_DIR))
+          print("ready", platform_tag(), host_library_path(PACKAGE_DIR))
+          PY
+
+      - name: Pytest (real native path)
+        run: python -m pytest -q
+
+      - name: Build host platform wheel
+        run: |
+          set -euo pipefail
+          TAG="$(python - <<'PY'
+          from cortext.assets import platform_tag
+          print(platform_tag())
+          PY
+          )"
+          python scripts/build_wheels.py --target "$TAG" --out dist/wheels
+          ls -lh dist/wheels/
+
+  source-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: No oversize natives committed
+        run: |
+          set -euo pipefail
+          # Fail if someone commits a >100MB file
+          found="$(find . -type f -size +95M -not -path './.git/*' | head || true)"
+          if [[ -n "$found" ]]; then
+            echo "Files over GitHub limit:"
+            echo "$found"
+            exit 1
+          fi
+          # Natives must not be in tree on a clean checkout
+          if find cortext/native -type f \( -name '*.so' -o -name '*.dylib' -o -name '*.dll' \) | grep -q .; then
+            echo "Native libraries must not be committed; vendor in CI instead"
+            find cortext/native -type f \( -name '*.so' -o -name '*.dylib' -o -name '*.dll' \)
+            exit 1
+          fi
+          echo "source-check ok"

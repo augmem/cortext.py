@@ -1,0 +1,179 @@
+name: Release platform wheels
+
+# PyTorch-style distribution: fat platform wheels live on GitHub Releases,
+# not pypi.org. Clients install with:
+#   pip install cortext==X.Y.Z --find-links \
+#     https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/index.html
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build/publish (e.g. v1.2.4). Empty = package version from pyproject."
+        required: false
+        default: ""
+      cortext_assets_tag:
+        description: "Upstream augmem/cortext assets tag to vendor (default: same as release tag)."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  release-wheels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve versions
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${{ github.ref_name }}"
+          elif [[ -n "${{ inputs.tag }}" ]]; then
+            TAG="${{ inputs.tag }}"
+          else
+            VER="$(python3 -c "import re,pathlib; t=pathlib.Path('pyproject.toml').read_text(); m=re.search(r'version\\s*=\\s*\\\"([^\\\"]+)\\\"', t); print(m.group(1))")"
+            TAG="v${VER}"
+          fi
+          VERSION="${TAG#v}"
+          ASSETS_TAG="${{ inputs.cortext_assets_tag }}"
+          if [[ -z "$ASSETS_TAG" ]]; then
+            ASSETS_TAG="$TAG"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "assets_tag=$ASSETS_TAG" >> "$GITHUB_OUTPUT"
+          echo "repo=${{ github.repository }}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag=$TAG version=$VERSION assets_tag=$ASSETS_TAG"
+
+      - name: Install build tools
+        run: python -m pip install -U pip build wheel
+
+      - name: Vendor natives + models from augmem/cortext release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Natives are not stored in git (GitHub 100 MiB file limit). Always
+          # fetch the multi-arch wheel inputs from the engine release.
+          python3 scripts/vendor_release_assets.py \
+            --from-release "${{ steps.ver.outputs.assets_tag }}" \
+            --force
+          test -f cortext/models/manifest.json
+          for tag in linux-x86_64 linux-aarch64 macos-x86_64 macos-aarch64 windows-x86_64 windows-aarch64; do
+            art="libcortext.so"
+            case "$tag" in
+              macos-*) art="libcortext.dylib" ;;
+              windows-*) art="cortext.dll" ;;
+            esac
+            test -f "cortext/native/$tag/$art"
+          done
+
+      - name: Build all platform wheels
+        run: python3 scripts/build_wheels.py --out dist/wheels
+
+      - name: Write GitHub Release indexes (absolute URLs)
+        run: |
+          set -euo pipefail
+          BASE="https://github.com/${{ steps.ver.outputs.repo }}/releases/download/${{ steps.ver.outputs.tag }}"
+          python3 scripts/write_wheel_index.py dist/wheels \
+            --version "${{ steps.ver.outputs.version }}" \
+            --base-url "$BASE" \
+            --repo "${{ steps.ver.outputs.repo }}"
+          # Ship curl installer next to the wheels
+          cp scripts/install.sh dist/wheels/install.sh
+          ls -lh dist/wheels/
+
+      - name: Inventory
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          wheels = sorted(Path("dist/wheels").glob("*.whl"))
+          assert len(wheels) == 6, wheels
+          for w in wheels:
+              assert "py3-none-any" not in w.name, w.name
+              print(f"{w.name} {w.stat().st_size/1024/1024:.1f} MiB")
+          assert (Path("dist/wheels") / "index.html").is_file()
+          assert (Path("dist/wheels") / "simple" / "cortext" / "index.html").is_file()
+          print("ok")
+          PY
+
+      - name: Create or update GitHub Release + upload wheels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.ver.outputs.tag }}"
+          VERSION="${{ steps.ver.outputs.version }}"
+          REPO="${{ steps.ver.outputs.repo }}"
+          BASE="https://github.com/${REPO}/releases/download/${TAG}"
+
+          BODY="$(cat <<EOF
+          ## cortext.py ${VERSION}
+
+          Platform wheels (turnkey natives + AIST model chunks) are attached to this release — **not** published to pypi.org (same pattern as PyTorch’s secondary wheel index).
+
+          ### Install
+
+          \`\`\`bash
+          pip install cortext==${VERSION} --find-links ${BASE}/index.html
+          # or
+          uv pip install cortext==${VERSION} --find-links ${BASE}/index.html
+          # or
+          curl -fsSL ${BASE}/install.sh | bash -s -- ${TAG}
+          \`\`\`
+
+          Pip selects the matching \`py3-none-<platform>\` wheel for your OS/arch.
+
+          Artifacts: six platform \`.whl\` files, \`index.html\` (find-links), \`install.sh\`, \`INSTALL.md\`, and \`simple-index.tar.gz\` (PEP 503 tree for mirrors / private indexes).
+          EOF
+          )"
+
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Updating existing release $TAG"
+            gh release edit "$TAG" --repo "$REPO" --notes "$BODY" || true
+          else
+            echo "Creating release $TAG"
+            # --verify-tag fails if the tag is only local to the workflow ref; create without it as fallback
+            gh release create "$TAG" \
+              --repo "$REPO" \
+              --title "cortext.py ${VERSION}" \
+              --notes "$BODY" \
+              --verify-tag \
+              || gh release create "$TAG" \
+                --repo "$REPO" \
+                --title "cortext.py ${VERSION}" \
+                --notes "$BODY"
+          fi
+
+          cd dist/wheels
+          tar -czf simple-index.tar.gz simple INSTALL.md index.html install.sh
+          gh release upload "$TAG" \
+            --repo "$REPO" \
+            --clobber \
+            ./*.whl \
+            index.html \
+            install.sh \
+            INSTALL.md \
+            simple-index.tar.gz
+
+          echo "Published ${TAG} wheels to ${BASE}/"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cortext-platform-wheels-${{ steps.ver.outputs.version }}
+          path: dist/wheels/
+          if-no-files-found: error

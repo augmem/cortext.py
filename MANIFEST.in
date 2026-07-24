@@ -1,0 +1,7 @@
+include README.md
+include LICENSE
+include .gitattributes
+recursive-include cortext/native *
+recursive-include cortext/models *
+include cortext/py.typed
+include cortext/assets-manifest.json

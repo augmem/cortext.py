@@ -1,0 +1,48 @@
+{
+  "schema": "augmem.cortext.native.v1",
+  "optimize": "ReleaseSmall",
+  "targets": [
+    {
+      "package_tag": "linux-x86_64",
+      "zig_target": "x86_64-linux-gnu.2.17",
+      "artifact": "libcortext.so",
+      "size": 147332704,
+      "sha256": "00cf570bd240722bade4fdc78ed2bbdddfb0a88ef0a1b5e0f123358a5cbc5033"
+    },
+    {
+      "package_tag": "linux-aarch64",
+      "zig_target": "aarch64-linux-gnu.2.17",
+      "artifact": "libcortext.so",
+      "size": 147088680,
+      "sha256": "87a60920ce57a1683a45a3c9fb0dc72fb7333fe32533a4f7d566e0737a943a54"
+    },
+    {
+      "package_tag": "macos-x86_64",
+      "zig_target": "x86_64-macos",
+      "artifact": "libcortext.dylib",
+      "size": 146886576,
+      "sha256": "a29d01917ae7d0fca3622ffaf57a43fbe85da1093792866692e8080d1312b2fe"
+    },
+    {
+      "package_tag": "macos-aarch64",
+      "zig_target": "aarch64-macos",
+      "artifact": "libcortext.dylib",
+      "size": 147373336,
+      "sha256": "edfd5b7d444a749f15f810aed47d7f4cb3e20c9b05dae357713b7eed95ea27b8"
+    },
+    {
+      "package_tag": "windows-x86_64",
+      "zig_target": "x86_64-windows-gnu",
+      "artifact": "cortext.dll",
+      "size": 145932288,
+      "sha256": "1ce730902e97dfdca32535f5a5a9f2bec57be48f6e27d3f673d9956b0a197689"
+    },
+    {
+      "package_tag": "windows-aarch64",
+      "zig_target": "aarch64-windows-gnu",
+      "artifact": "cortext.dll",
+      "size": 145532416,
+      "sha256": "2184ed06179b040c96d3358e84c9c4cc70c029ec768f2960cb4e41062dd08587"
+    }
+  ]
+}

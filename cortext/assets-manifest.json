@@ -1,0 +1,87 @@
+{
+  "schema": "augmem.cortext.release_assets.v1",
+  "cortext_version": "1.2.4",
+  "optimize": "ReleaseSmall",
+  "layout": {
+    "native": "native/",
+    "models": "models/"
+  },
+  "native": {
+    "schema": "augmem.cortext.native.v1",
+    "optimize": "ReleaseSmall",
+    "targets": [
+      {
+        "package_tag": "linux-x86_64",
+        "zig_target": "x86_64-linux-gnu.2.17",
+        "artifact": "libcortext.so",
+        "size": 147332704,
+        "sha256": "00cf570bd240722bade4fdc78ed2bbdddfb0a88ef0a1b5e0f123358a5cbc5033"
+      },
+      {
+        "package_tag": "linux-aarch64",
+        "zig_target": "aarch64-linux-gnu.2.17",
+        "artifact": "libcortext.so",
+        "size": 147088680,
+        "sha256": "87a60920ce57a1683a45a3c9fb0dc72fb7333fe32533a4f7d566e0737a943a54"
+      },
+      {
+        "package_tag": "macos-x86_64",
+        "zig_target": "x86_64-macos",
+        "artifact": "libcortext.dylib",
+        "size": 146886576,
+        "sha256": "a29d01917ae7d0fca3622ffaf57a43fbe85da1093792866692e8080d1312b2fe"
+      },
+      {
+        "package_tag": "macos-aarch64",
+        "zig_target": "aarch64-macos",
+        "artifact": "libcortext.dylib",
+        "size": 147373336,
+        "sha256": "edfd5b7d444a749f15f810aed47d7f4cb3e20c9b05dae357713b7eed95ea27b8"
+      },
+      {
+        "package_tag": "windows-x86_64",
+        "zig_target": "x86_64-windows-gnu",
+        "artifact": "cortext.dll",
+        "size": 145932288,
+        "sha256": "1ce730902e97dfdca32535f5a5a9f2bec57be48f6e27d3f673d9956b0a197689"
+      },
+      {
+        "package_tag": "windows-aarch64",
+        "zig_target": "aarch64-windows-gnu",
+        "artifact": "cortext.dll",
+        "size": 145532416,
+        "sha256": "2184ed06179b040c96d3358e84c9c4cc70c029ec768f2960cb4e41062dd08587"
+      }
+    ]
+  },
+  "models": {
+    "schema": "augmem.cortext.models.v1",
+    "cortext_version": "1.2.4",
+    "note": "AIST model is Git-chunked under 100 MiB so it can live in ordinary Git without LFS. Language bindings reassemble and checksum on first use; do not re-shard in binding repos \u2014 copy this tree from cortext.",
+    "assets": [
+      {
+        "filename": "AIST-87M-GGUF/AIST-87M_q8_0.gguf",
+        "sha256": "bf4c49954eccc65183f1a97e44606e86c7ee5a4fea500457124b687a3ec97898",
+        "size": 141491936,
+        "chunks": [
+          {
+            "filename": "AIST-87M-GGUF/chunks/AIST-87M_q8_0.gguf.part-000",
+            "sha256": "7f23effe470c0dbaf425457089877f060b7dcf0c5e7aa2be1d5422c5e3584a99"
+          },
+          {
+            "filename": "AIST-87M-GGUF/chunks/AIST-87M_q8_0.gguf.part-001",
+            "sha256": "bcd66bfc6a376a86997a3ac801456c7441aca2f964876d594d5e44c515cde759"
+          },
+          {
+            "filename": "AIST-87M-GGUF/chunks/AIST-87M_q8_0.gguf.part-002",
+            "sha256": "e91b751509f1a1901cb3b9922233e6a4aaf241b224ce522f5de709c7d01a4124"
+          }
+        ]
+      },
+      {
+        "filename": "mdbr-leaf-ir/vocab.txt",
+        "sha256": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
+      }
+    ]
+  }
+}
