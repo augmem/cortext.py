@@ -19,7 +19,7 @@ from pathlib import Path
 from .assets import PACKAGE_DIR, host_native_present, platform_tag
 
 DEFAULT_RELEASE_TAG = os.environ.get("CORTEXT_RELEASE_TAG", "v1.2.4")
-DEFAULT_RELEASE_REPO = os.environ.get("CORTEXT_RELEASE_REPO", "augmem/cortext")
+DEFAULT_RELEASE_REPO = os.environ.get("CORTEXT_RELEASE_REPO", "augmem/cortext.cpp")
 
 
 def _http_json(url: str) -> dict:

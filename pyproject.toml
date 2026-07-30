@@ -31,7 +31,7 @@ classifiers = [
 Homepage = "https://github.com/augmem/cortext"
 Repository = "https://github.com/augmem/cortext.py"
 Issues = "https://github.com/augmem/cortext.py/issues"
-Releases = "https://github.com/augmem/cortext/releases"
+Releases = "https://github.com/augmem/cortext.cpp/releases"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "build>=1.2", "wheel>=0.43"]
