@@ -411,6 +411,32 @@ def _configure_library(lib: ctypes.CDLL) -> ctypes.CDLL:
     ]
     lib.cortext_process_audio_json_with_options.restype = ctypes.c_void_p
 
+    text_media_json = getattr(lib, "cortext_process_text_with_media_json", None)
+    text_media_json_with_options = getattr(
+        lib, "cortext_process_text_with_media_json_with_options", None
+    )
+    lib._cortext_text_media_json_available = (
+        text_media_json is not None and text_media_json_with_options is not None
+    )
+    if text_media_json is not None:
+        text_media_json.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+            ctypes.POINTER(_NativeMedia),
+        ]
+        text_media_json.restype = ctypes.c_void_p
+
+    if text_media_json_with_options is not None:
+        text_media_json_with_options.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+            ctypes.POINTER(_NativeMedia),
+            ctypes.POINTER(_NativeProcessJsonOptions),
+        ]
+        text_media_json_with_options.restype = ctypes.c_void_p
+
     lib.cortext_process_audio_with_media_json.argtypes = [
         ctypes.c_void_p,
         ctypes.POINTER(ctypes.c_float),
@@ -1131,6 +1157,52 @@ class Cortext:
         return json.loads(
             self.process_text_json(
                 text, source_id, include_embedding, retention
+            )
+        )
+
+    def process_text_with_media_json(
+        self,
+        text: str,
+        source_id: str,
+        media: Media | bytes | bytearray | memoryview | None = None,
+        media_mimetype: str | None = None,
+        include_embedding: bool = True,
+        retention: Retention | int | None = None,
+    ) -> str:
+        if not getattr(self._lib, "_cortext_text_media_json_available", False):
+            raise RuntimeError(
+                "loaded native library does not support text media processing"
+            )
+        native_media, media_buffer, mimetype_buffer = _native_media(
+            media, media_mimetype
+        )
+        options = _native_process_json_options(include_embedding, retention)
+        _ = (media_buffer, mimetype_buffer)
+        return self._call_json(
+            self._lib.cortext_process_text_with_media_json_with_options,
+            text.encode("utf-8"),
+            source_id.encode("utf-8"),
+            ctypes.byref(native_media),
+            ctypes.byref(options),
+        )
+
+    def process_text_with_media(
+        self,
+        text: str,
+        source_id: str,
+        media: Media | bytes | bytearray | memoryview | None = None,
+        media_mimetype: str | None = None,
+        include_embedding: bool = True,
+        retention: Retention | int | None = None,
+    ) -> dict[str, Any]:
+        return json.loads(
+            self.process_text_with_media_json(
+                text,
+                source_id,
+                media,
+                media_mimetype,
+                include_embedding,
+                retention,
             )
         )
 

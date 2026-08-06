@@ -59,6 +59,9 @@ with cortext.Cortext(":memory:") as memory:
     print(len(emb))
 ```
 
+For binary attachments, pass `Media(data, mimetype)` or raw bytes with
+`media_mimetype` to `process_text_with_media`.
+
 Python 3.10+. Binding **1.2.4** tracks engine **v1.2.4**.
 
 ## Why not pypi.org?
