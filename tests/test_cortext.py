@@ -128,6 +128,28 @@ def test_process_text_and_embed_text(tmp_path):
         clear_materialize_cache()
 
 
+def test_text_media_capability_only_requires_options_symbol():
+    import cortext
+
+    class FakeFunction:
+        pass
+
+    class FakeLibrary:
+        def __init__(self):
+            self.functions = {}
+
+        def __getattr__(self, name):
+            if name == "cortext_process_text_with_media_json":
+                raise AttributeError(name)
+            function = self.functions.setdefault(name, FakeFunction())
+            return function
+
+    lib = cortext._configure_library(FakeLibrary())
+
+    assert lib._cortext_text_media_json_available is True
+    assert "cortext_process_text_with_media_json_with_options" in lib.functions
+
+
 def test_process_text_with_media_forwards_binary_bytes_and_mimetype():
     import ctypes
 

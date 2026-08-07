@@ -415,9 +415,7 @@ def _configure_library(lib: ctypes.CDLL) -> ctypes.CDLL:
     text_media_json_with_options = getattr(
         lib, "cortext_process_text_with_media_json_with_options", None
     )
-    lib._cortext_text_media_json_available = (
-        text_media_json is not None and text_media_json_with_options is not None
-    )
+    lib._cortext_text_media_json_available = text_media_json_with_options is not None
     if text_media_json is not None:
         text_media_json.argtypes = [
             ctypes.c_void_p,
