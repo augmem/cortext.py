@@ -82,7 +82,7 @@ def require_native(tag: str, artifact: str) -> Path:
     if not path.is_file():
         raise SystemExit(
             f"missing native for {tag}: {path}\n"
-            "Run: python3 scripts/vendor_release_assets.py --from-release v1.2.4"
+            "Run: python3 scripts/vendor_release_assets.py --from-release v1.3.0"
         )
     return path
 

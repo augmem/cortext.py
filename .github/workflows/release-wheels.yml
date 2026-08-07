@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build/publish (e.g. v1.2.4). Empty = package version from pyproject."
+        description: "Release tag to build/publish (e.g. v1.3.0). Empty = package version from pyproject."
         required: false
         default: ""
       cortext_assets_tag:

@@ -37,9 +37,8 @@ jobs:
         run: |
           set -euo pipefail
           VER="$(python -c "import re,pathlib; t=pathlib.Path('pyproject.toml').read_text(); m=re.search(r'version\\s*=\\s*\\\"([^\\\"]+)\\\"', t); print(m.group(1))")"
-          # Prefer matching engine tag; fall back to v1.2.4 if pin differs
-          python scripts/vendor_release_assets.py --from-release "v${VER}" --force \
-            || python scripts/vendor_release_assets.py --from-release v1.2.4 --force
+          # Release metadata and shipped assets must track the matching engine tag.
+          python scripts/vendor_release_assets.py --from-release "v${VER}" --force
           test -f cortext/models/manifest.json
           python - <<'PY'
           from cortext.assets import package_assets_ready, platform_tag, host_library_path, PACKAGE_DIR
