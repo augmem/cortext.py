@@ -128,6 +128,69 @@ def test_process_text_and_embed_text(tmp_path):
         clear_materialize_cache()
 
 
+def test_text_media_capability_only_requires_options_symbol():
+    import cortext
+
+    class FakeFunction:
+        pass
+
+    class FakeLibrary:
+        def __init__(self):
+            self.functions = {}
+
+        def __getattr__(self, name):
+            if name == "cortext_process_text_with_media_json":
+                raise AttributeError(name)
+            function = self.functions.setdefault(name, FakeFunction())
+            return function
+
+    lib = cortext._configure_library(FakeLibrary())
+
+    assert lib._cortext_text_media_json_available is True
+    assert "cortext_process_text_with_media_json_with_options" in lib.functions
+
+
+def test_process_text_with_media_forwards_binary_bytes_and_mimetype():
+    import ctypes
+
+    import cortext
+
+    native_fn = object()
+    fake_lib = type("FakeLib", (), {
+        "cortext_process_text_with_media_json_with_options": native_fn,
+        "_cortext_text_media_json_available": True,
+    })()
+    engine = object.__new__(cortext.Cortext)
+    engine._lib = fake_lib
+    engine._handle = None
+    captured = {}
+
+    def call_json(fn, *args):
+        captured["fn"] = fn
+        captured["text"] = args[0]
+        captured["source_id"] = args[1]
+        media = ctypes.cast(
+            args[2], ctypes.POINTER(cortext._NativeMedia)
+        ).contents
+        captured["media"] = ctypes.string_at(media.data, media.size)
+        captured["mimetype"] = ctypes.string_at(media.mimetype)
+        return '{"ok": true}'
+
+    engine._call_json = call_json
+    payload = b"\x00\xff\x01"
+
+    assert engine.process_text_with_media(
+        "text", "source", payload, "application/octet-stream"
+    ) == {"ok": True}
+    assert captured == {
+        "fn": native_fn,
+        "text": b"text",
+        "source_id": b"source",
+        "media": payload,
+        "mimetype": b"application/octet-stream",
+    }
+
+
 def test_embedding_length_stable(tmp_path):
     import cortext
     from cortext.model import clear_materialize_cache
