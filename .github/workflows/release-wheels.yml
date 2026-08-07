@@ -2,7 +2,7 @@ name: Release platform wheels
 
 # PyTorch-style distribution: fat platform wheels live on GitHub Releases,
 # not pypi.org. Clients install with:
-#   pip install cortext==X.Y.Z --find-links \
+#   pip install augmem.cortext==X.Y.Z --find-links \
 #     https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/index.html
 
 on:
@@ -124,14 +124,14 @@ jobs:
           BODY="$(cat <<EOF
           ## cortext.py ${VERSION}
 
-          Platform wheels (turnkey natives + AIST model chunks) are attached to this release — **not** published to pypi.org (same pattern as PyTorch’s secondary wheel index).
+          Platform wheels (turnkey natives + AIST model chunks) are attached to this release. The slim `augmem.cortext` package is published separately to pypi.org.
 
           ### Install
 
           \`\`\`bash
-          pip install cortext==${VERSION} --find-links ${BASE}/index.html
+          pip install augmem.cortext==${VERSION} --find-links ${BASE}/index.html
           # or
-          uv pip install cortext==${VERSION} --find-links ${BASE}/index.html
+          uv pip install augmem.cortext==${VERSION} --find-links ${BASE}/index.html
           # or
           curl -fsSL ${BASE}/install.sh | bash -s -- ${TAG}
           \`\`\`

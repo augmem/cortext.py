@@ -2,9 +2,20 @@
 
 Turnkey pure-Python (ctypes) bindings for [Cortext](https://github.com/augmem/cortext).
 
-**Distribution model (PyTorch-style):** large platform wheels are published on
-**GitHub Releases**, not pypi.org. Each wheel ships one OS/arch native plus the
-AIST model chunks — install is offline after the wheel download.
+The `augmem.cortext` PyPI package contains all six thin platform natives and
+downloads the pinned AIST model on first engine creation. Full offline wheels
+with embedded model chunks remain available on GitHub Releases.
+
+## Install from PyPI
+
+```bash
+pip install augmem.cortext==1.3.0
+# or
+uv pip install augmem.cortext==1.3.0
+```
+
+The first `Cortext` instance downloads and verifies the AIST model and
+tokenizer. Set `CORTEXT_AIST_MODEL_PATH` to an existing GGUF for offline use.
 
 ## Install (GitHub Releases wheelhouse)
 
@@ -13,9 +24,9 @@ AIST model chunks — install is offline after the wheel download.
 export CORTEXT_VERSION=1.3.0
 export CORTEXT_INDEX="https://github.com/augmem/cortext.py/releases/download/v${CORTEXT_VERSION}/index.html"
 
-pip install "cortext==${CORTEXT_VERSION}" --find-links "${CORTEXT_INDEX}"
+pip install "augmem.cortext==${CORTEXT_VERSION}" --find-links "${CORTEXT_INDEX}"
 # or
-uv pip install "cortext==${CORTEXT_VERSION}" --find-links "${CORTEXT_INDEX}"
+uv pip install "augmem.cortext==${CORTEXT_VERSION}" --find-links "${CORTEXT_INDEX}"
 
 # one-liner
 curl -fsSL "https://github.com/augmem/cortext.py/releases/download/v${CORTEXT_VERSION}/install.sh" \
@@ -26,7 +37,7 @@ Pip/uv selects the matching `py3-none-<platform>` wheel automatically.
 
 ### Private / mirror simple index (optional)
 
-GitHub Releases are flat files, so a live `…/simple/cortext/` URL is not
+GitHub Releases are flat files, so a live `…/simple/augmem-cortext/` URL is not
 available on the release itself. Each release includes `simple-index.tar.gz`
 (PEP 503 layout with absolute wheel URLs) for hosting on Pages, S3, or an
 internal index:
@@ -34,14 +45,14 @@ internal index:
 ```bash
 tar -xzf simple-index.tar.gz
 # serve the extracted simple/ directory, then:
-pip install cortext==1.3.0 --index-url https://your-mirror.example/simple/
+pip install augmem.cortext==1.3.0 --index-url https://your-mirror.example/simple/
 ```
 
 ### Local wheelhouse / editable checkout
 
 ```bash
 # After scripts/build_wheels.py
-pip install cortext==1.3.0 --find-links dist/wheels --no-index
+pip install augmem.cortext==1.3.0 --find-links dist/wheels --no-index
 
 # Dev monorepo (all six natives in-tree)
 uv sync
@@ -64,17 +75,16 @@ For binary attachments, pass `Media(data, mimetype)` or raw bytes with
 
 Python 3.10+. Binding **1.3.0** tracks engine **v1.3.0**.
 
-## Why not pypi.org?
+## Distribution channels
 
-Default PyPI limits are **~100 MB per file**. Each platform wheel is ~250 MiB
-(native with embedded model + model chunks). PyTorch solves this with a
-secondary index (`download.pytorch.org`); we use **GitHub Release assets** the
-same way.
+Default PyPI limits are **~100 MB per file**. The PyPI wheel stays below that
+limit by shipping thin natives and fetching the verified model on first use.
+GitHub Release wheels are larger but work offline after download.
 
 | Channel | Contents |
 | --- | --- |
 | GitHub Release `vX.Y.Z` | Six platform wheels + `index.html` + `install.sh` |
-| pypi.org | Not used for fat wheels (limit) |
+| pypi.org | Slim wheel + verified first-use model bootstrap |
 | git checkout | Sources + model chunks; **natives vendored in CI** (files are ~140 MiB and exceed GitHub’s git limit) |
 
 Local full tree after clone:
@@ -89,7 +99,7 @@ uv sync && uv run pytest -q
 ```text
 cortext/
   native/<this-platform-only>/libcortext.* | cortext.dll
-  models/   # AIST chunks + vocab + manifest
+  models/   # AIST chunks + vocab + manifest (GitHub Release wheel only)
   *.py      # ctypes binding
 ```
 
@@ -108,9 +118,10 @@ cortext/
 | --- | --- |
 | 1 | `CORTEXT_LIBRARY_PATH` / `CORTEXT_AIST_MODEL_PATH` |
 | 2 | `CORTEXT_ASSETS_DIR` |
-| 3 | Shipped package `native/` + `models/` (the wheel contents) |
+| 3 | Shipped package `native/` + `models/` (GitHub Release wheel) or verified model cache (PyPI wheel) |
 
-No sibling checkouts and no runtime GitHub download on the happy path.
+No sibling checkouts are searched. The PyPI wheel downloads only its pinned
+model assets when no explicit model path is provided.
 
 ## Environment (optional)
 
@@ -130,10 +141,15 @@ python3 scripts/vendor_release_assets.py --from-release v1.3.0 --force
 # 2) Build platform wheels + local indexes
 python3 scripts/build_wheels.py
 
-# 3) Tag + push — CI (.github/workflows/release-wheels.yml) builds, writes
+# 3) Build the PyPI package from thin natives
+python3 scripts/build_pypi.py --native-root /path/to/cortext-thin-v1.3-build
+
+# 4) Tag + push — CI (.github/workflows/release-wheels.yml) builds, writes
 #    absolute-URL indexes, and uploads everything to the GitHub Release
 git tag v1.3.0
 git push origin v1.3.0
+
+# 5) Upload dist/pypi/* to PyPI with a configured API token
 ```
 
 Manual publish of an existing wheelhouse:

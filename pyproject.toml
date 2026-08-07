@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cortext"
+name = "augmem.cortext"
 version = "1.3.0"
-description = "Turnkey Python bindings for Cortext — ships multi-arch natives and AIST model chunks"
+description = "Python bindings for Cortext with multi-platform native libraries"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
@@ -49,7 +49,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["cortext*"]
+include = ["cortext*", "augmem*"]
 
 [tool.setuptools.package-data]
 cortext = [
@@ -58,6 +58,7 @@ cortext = [
   "native/**/*",
   "models/**/*",
 ]
+"augmem.cortext" = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

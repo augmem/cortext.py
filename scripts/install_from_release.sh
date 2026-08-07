@@ -36,15 +36,15 @@ VERSION="${TAG#v}"
 BASE="https://github.com/${REPO}/releases/download/${TAG}"
 INDEX="${BASE}/index.html"
 
-echo "Installing cortext==${VERSION}"
+echo "Installing augmem.cortext==${VERSION}"
 echo "  repo:  ${REPO}"
 echo "  index: ${INDEX}"
 
 if [[ "${UV:-0}" == "1" ]] || command -v uv >/dev/null 2>&1 && [[ "${USE_UV:-1}" == "1" ]]; then
   if command -v uv >/dev/null 2>&1; then
-    exec uv pip install "cortext==${VERSION}" --find-links "${INDEX}"
+    exec uv pip install "augmem.cortext==${VERSION}" --find-links "${INDEX}"
   fi
 fi
 
 PIP_CMD="${PIP:-python3 -m pip}"
-exec ${PIP_CMD} install "cortext==${VERSION}" --find-links "${INDEX}"
+exec ${PIP_CMD} install "augmem.cortext==${VERSION}" --find-links "${INDEX}"

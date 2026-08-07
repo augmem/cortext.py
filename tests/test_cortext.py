@@ -240,3 +240,23 @@ def test_build_wheels_script_maps_all_targets():
         "win_arm64",
     ):
         assert plat in script
+
+
+def test_augmem_namespace_compatibility():
+    import augmem.cortext as compat
+    import cortext
+
+    assert compat.Cortext is cortext.Cortext
+    assert compat.Media is cortext.Media
+
+
+def test_model_resolution_falls_back_to_verified_cache(monkeypatch, tmp_path):
+    import cortext.model as model
+
+    expected = tmp_path / "AIST-87M_q8_0.gguf"
+    expected.write_bytes(b"verified-test-placeholder")
+    monkeypatch.setenv("CORTEXT_MODEL_CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(model, "chunks_ready", lambda: False)
+    monkeypatch.setattr(model, "_remote_model_path", lambda _cache: str(expected))
+
+    assert model.resolve_aist_model() == str(expected)

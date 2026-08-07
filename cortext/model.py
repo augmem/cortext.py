@@ -11,6 +11,8 @@ import platform
 import shutil
 import tempfile
 import threading
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +23,19 @@ VOCAB_ASSET_NAME = "mdbr-leaf-ir/vocab.txt"
 
 _materialize_lock = threading.Lock()
 _materialized_cache: dict[str, str] = {}
+
+_AIST_MODEL_URL = (
+    "https://huggingface.co/augmem/AIST-87M-GGUF/resolve/main/"
+    "AIST-87M_q8_0.gguf?download=1"
+)
+_AIST_MODEL_SHA256 = "bf4c49954eccc65183f1a97e44606e86c7ee5a4fea500457124b687a3ec97898"
+_AIST_MODEL_SIZE = 141491936
+_VOCAB_URL = (
+    "https://huggingface.co/bert-base-uncased/resolve/main/vocab.txt?download=1"
+)
+_VOCAB_SHA256 = "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
+_VOCAB_SIZE = 231508
+_DOWNLOAD_TIMEOUT_SECONDS = 60
 
 
 def models_root() -> Path:
@@ -89,6 +104,55 @@ def default_user_model_cache() -> Path:
         return Path(base).expanduser() / "augmem" / "cortext" / "models"
     base = os.environ.get("XDG_CACHE_HOME") or str(home / ".cache")
     return Path(base).expanduser() / "augmem" / "cortext" / "models"
+
+
+def _verified_file(path: Path, sha256: str, size: int) -> bool:
+    return path.is_file() and path.stat().st_size == size and sha256_file(path) == sha256
+
+
+def _download_verified(url: str, dest: Path, sha256: str, size: int) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{dest.name}.", suffix=".tmp", dir=dest.parent)
+    os.close(fd)
+    tmp = Path(tmp_name)
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "augmem.cortext/1.3.0 model bootstrap"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=_DOWNLOAD_TIMEOUT_SECONDS) as response:
+            with tmp.open("wb") as output:
+                shutil.copyfileobj(response, output, length=1024 * 1024)
+        if not _verified_file(tmp, sha256, size):
+            actual_size = tmp.stat().st_size
+            actual_sha256 = sha256_file(tmp)
+            raise RuntimeError(
+                f"downloaded {dest.name} failed verification: "
+                f"size={actual_size} sha256={actual_sha256}"
+            )
+        tmp.replace(dest)
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(
+            f"could not download Cortext model asset {dest.name}: HTTP {exc.code}. "
+            "Set CORTEXT_AIST_MODEL_PATH to an existing AIST GGUF file or retry later."
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(
+            f"could not download Cortext model asset {dest.name}: {exc.reason}. "
+            "Set CORTEXT_AIST_MODEL_PATH to an existing AIST GGUF file or retry later."
+        ) from exc
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _remote_model_path(cache_dir: Path) -> str:
+    model_path = cache_dir / "AIST-87M-GGUF" / "AIST-87M_q8_0.gguf"
+    vocab_path = cache_dir / "mdbr-leaf-ir" / "vocab.txt"
+    if not _verified_file(model_path, _AIST_MODEL_SHA256, _AIST_MODEL_SIZE):
+        _download_verified(_AIST_MODEL_URL, model_path, _AIST_MODEL_SHA256, _AIST_MODEL_SIZE)
+    if not _verified_file(vocab_path, _VOCAB_SHA256, _VOCAB_SIZE):
+        _download_verified(_VOCAB_URL, vocab_path, _VOCAB_SHA256, _VOCAB_SIZE)
+    return os.fspath(model_path)
 
 
 def load_model_manifest(models: Path | None = None) -> dict[str, Any]:
@@ -220,17 +284,15 @@ def _materialize_model_locked(cache_dir: Path) -> str:
 
 
 def resolve_aist_model(db_path: str = ":memory:") -> str:
-    """Resolve model from shipped package chunks (materialize + verify).
+    """Resolve a verified model from shipped chunks or the pinned PyPI cache.
 
-    Explicit ``CORTEXT_AIST_MODEL_PATH`` is handled by the engine create path
-    before this is called.
+    Full GitHub Release wheels materialize their shipped chunks. The slim PyPI
+    wheel downloads the same pinned assets on first use.
     """
-    if not chunks_ready():
-        raise RuntimeError(
-            "shipped model chunks are missing under cortext/models/; "
-            "reinstall package data or set CORTEXT_AIST_MODEL_PATH"
-        )
-    return materialize_model(db_path)
+    if chunks_ready():
+        return materialize_model(db_path)
+    with _materialize_lock:
+        return _remote_model_path(model_cache_dir(db_path))
 
 
 def clear_materialize_cache(cache_dir: Path | str | None = None) -> None:

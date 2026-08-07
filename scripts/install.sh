@@ -7,8 +7,8 @@ REPO="${CORTEXT_PY_REPO:-augmem/cortext.py}"
 VERSION="${TAG#v}"
 BASE="https://github.com/${REPO}/releases/download/${TAG}"
 INDEX="${BASE}/index.html"
-echo "Installing cortext==${VERSION} from ${INDEX}"
+echo "Installing augmem.cortext==${VERSION} from ${INDEX}"
 if command -v uv >/dev/null 2>&1; then
-  exec uv pip install "cortext==${VERSION}" --find-links "${INDEX}"
+  exec uv pip install "augmem.cortext==${VERSION}" --find-links "${INDEX}"
 fi
-exec python3 -m pip install "cortext==${VERSION}" --find-links "${INDEX}"
+exec python3 -m pip install "augmem.cortext==${VERSION}" --find-links "${INDEX}"

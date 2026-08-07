@@ -547,8 +547,9 @@ def load_library(path: str | os.PathLike[str] | None = None) -> ctypes.CDLL:
     2. ``CORTEXT_LIBRARY_PATH``
     3. Host native under ``CORTEXT_ASSETS_DIR`` or the package ``native/`` tree
 
-    Turnkey installs include all six platform natives + model chunks as package
-    data — no network download at runtime.
+    Turnkey GitHub Release installs include all six platform natives + model
+    chunks. The slim PyPI install includes all six thin natives and downloads
+    the verified model only when an engine is first created.
     """
     if path is not None:
         lib_path = Path(path)

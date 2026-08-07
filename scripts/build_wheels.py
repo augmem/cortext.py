@@ -278,11 +278,11 @@ def main() -> int:
     print("\nInstall (current machine picks matching wheel):", flush=True)
     if args.base_url:
         idx = f"{args.base_url.rstrip('/')}/index.html"
-        print(f"  pip install cortext=={version} --find-links {idx}", flush=True)
-        print(f"  uv pip install cortext=={version} --find-links {idx}", flush=True)
+        print(f"  pip install augmem.cortext=={version} --find-links {idx}", flush=True)
+        print(f"  uv pip install augmem.cortext=={version} --find-links {idx}", flush=True)
     else:
-        print(f"  pip install cortext=={version} --find-links {out_dir} --no-index", flush=True)
-        print(f"  uv pip install cortext=={version} --find-links {out_dir}", flush=True)
+        print(f"  pip install augmem.cortext=={version} --find-links {out_dir} --no-index", flush=True)
+        print(f"  uv pip install augmem.cortext=={version} --find-links {out_dir}", flush=True)
         print(
             "  # GitHub Releases (after publish):\n"
             f"  ./scripts/install_from_release.sh v{version}",

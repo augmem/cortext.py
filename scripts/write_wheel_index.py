@@ -4,7 +4,7 @@
 Produces:
   index.html              — flat find-links page (pip --find-links URL)
   simple/index.html       — PEP 503 root
-  simple/cortext/index.html — PEP 503 project page
+  simple/augmem-cortext/index.html — PEP 503 project page
 
 When --base-url is set, all links are absolute (required for GitHub Releases
 assets, since the index is itself a release asset).
@@ -46,10 +46,10 @@ def write_find_links(out_dir: Path, wheels: list[Path], version: str, base_url: 
     ]
     if base_url:
         index = f"{base_url.rstrip('/')}/index.html"
-        lines.append(f"pip install cortext=={version} --find-links {index}")
-        lines.append(f"uv pip install cortext=={version} --find-links {index}")
+        lines.append(f"pip install augmem.cortext=={version} --find-links {index}")
+        lines.append(f"uv pip install augmem.cortext=={version} --find-links {index}")
     else:
-        lines.append(f"pip install cortext=={version} --find-links {out_dir} --no-index")
+        lines.append(f"pip install augmem.cortext=={version} --find-links {out_dir} --no-index")
     lines.extend(["</pre>", "<ul>"])
     for whl in wheels:
         lines.append(f'  <li><a href="{href(whl.name, base_url)}">{whl.name}</a></li>')
@@ -60,7 +60,7 @@ def write_find_links(out_dir: Path, wheels: list[Path], version: str, base_url: 
 def write_pep503(out_dir: Path, wheels: list[Path], version: str, base_url: str | None) -> None:
     """Write a minimal simple repository under out_dir/simple/."""
     simple = out_dir / "simple"
-    project = simple / "cortext"
+    project = simple / "augmem-cortext"
     project.mkdir(parents=True, exist_ok=True)
 
     # Root simple index
@@ -69,7 +69,7 @@ def write_pep503(out_dir: Path, wheels: list[Path], version: str, base_url: str 
             [
                 "<!DOCTYPE html>",
                 "<html><head><meta charset='utf-8'><title>simple</title></head><body>",
-                '<a href="cortext/">cortext</a>',
+                '<a href="augmem-cortext/">augmem.cortext</a>',
                 "</body></html>",
                 "",
             ]
@@ -107,9 +107,9 @@ secondary index.
 ## Install (find-links)
 
 ```bash
-pip install cortext=={version} --find-links {index}
+pip install augmem.cortext=={version} --find-links {index}
 # or
-uv pip install cortext=={version} --find-links {index}
+uv pip install augmem.cortext=={version} --find-links {index}
 ```
 
 Pip/uv picks the matching `py3-none-<platform>` wheel for your OS/arch.

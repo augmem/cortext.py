@@ -11,7 +11,10 @@ Resolution order:
 1. ``CORTEXT_LIBRARY_PATH`` / ``CORTEXT_ASSETS_DIR`` — explicit overrides only
 2. This package directory (``Path(__file__).parent``) — the shipped default
 
-No network download, sibling trees, or system library search on the happy path.
+The PyPI wheel ships thin natives and downloads the verified model on first
+use; the GitHub Release wheelhouse additionally ships model chunks.
+
+No sibling trees or system library search are used by the asset locator.
 """
 from __future__ import annotations
 
@@ -97,27 +100,24 @@ def assets_root() -> Path:
             raise RuntimeError(
                 f"CORTEXT_ASSETS_DIR={path} missing host native for {platform_tag()}"
             )
-        if not (path / "models" / "manifest.json").is_file():
-            raise RuntimeError(
-                f"CORTEXT_ASSETS_DIR={path} missing models/manifest.json"
-            )
         return path
 
-    if package_assets_ready():
+    if host_native_present(PACKAGE_DIR):
         return PACKAGE_DIR
 
     raise RuntimeError(
-        "cortext package is missing shipped natives/models under "
-        f"{PACKAGE_DIR}/native and {PACKAGE_DIR}/models. "
-        "Rebuild with scripts/vendor_release_assets.py or set CORTEXT_ASSETS_DIR."
+        "cortext package is missing the host native under "
+        f"{PACKAGE_DIR}/native. Rebuild with scripts/vendor_release_assets.py "
+        "or set CORTEXT_ASSETS_DIR."
     )
 
 
 def models_root() -> Path:
-    root = assets_root()
+    env = os.environ.get("CORTEXT_ASSETS_DIR")
+    root = Path(env).expanduser().resolve() if env else PACKAGE_DIR
     models = root / "models"
-    if not models.is_dir():
-        raise RuntimeError(f"models directory missing under assets root {root}")
+    if not (models / "manifest.json").is_file():
+        raise RuntimeError(f"models/manifest.json missing under assets root {root}")
     return models
 
 
