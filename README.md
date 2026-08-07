@@ -10,7 +10,7 @@ AIST model chunks — install is offline after the wheel download.
 
 ```bash
 # Replace version as needed
-export CORTEXT_VERSION=1.2.4
+export CORTEXT_VERSION=1.3.0
 export CORTEXT_INDEX="https://github.com/augmem/cortext.py/releases/download/v${CORTEXT_VERSION}/index.html"
 
 pip install "cortext==${CORTEXT_VERSION}" --find-links "${CORTEXT_INDEX}"
@@ -34,14 +34,14 @@ internal index:
 ```bash
 tar -xzf simple-index.tar.gz
 # serve the extracted simple/ directory, then:
-pip install cortext==1.2.4 --index-url https://your-mirror.example/simple/
+pip install cortext==1.3.0 --index-url https://your-mirror.example/simple/
 ```
 
 ### Local wheelhouse / editable checkout
 
 ```bash
 # After scripts/build_wheels.py
-pip install cortext==1.2.4 --find-links dist/wheels --no-index
+pip install cortext==1.3.0 --find-links dist/wheels --no-index
 
 # Dev monorepo (all six natives in-tree)
 uv sync
@@ -62,7 +62,7 @@ with cortext.Cortext(":memory:") as memory:
 For binary attachments, pass `Media(data, mimetype)` or raw bytes with
 `media_mimetype` to `process_text_with_media`.
 
-Python 3.10+. Binding **1.2.4** tracks engine **v1.2.4**.
+Python 3.10+. Binding **1.3.0** tracks engine **v1.3.0**.
 
 ## Why not pypi.org?
 
@@ -80,7 +80,7 @@ same way.
 Local full tree after clone:
 
 ```bash
-python3 scripts/vendor_release_assets.py --from-release v1.2.4 --force
+python3 scripts/vendor_release_assets.py --from-release v1.3.0 --force
 uv sync && uv run pytest -q
 ```
 
@@ -125,25 +125,25 @@ No sibling checkouts and no runtime GitHub download on the happy path.
 
 ```bash
 # 1) Vendor engine assets (or rely on CI to fetch augmem/cortext release)
-python3 scripts/vendor_release_assets.py --from-release v1.2.4 --force
+python3 scripts/vendor_release_assets.py --from-release v1.3.0 --force
 
 # 2) Build platform wheels + local indexes
 python3 scripts/build_wheels.py
 
 # 3) Tag + push — CI (.github/workflows/release-wheels.yml) builds, writes
 #    absolute-URL indexes, and uploads everything to the GitHub Release
-git tag v1.2.4
-git push origin v1.2.4
+git tag v1.3.0
+git push origin v1.3.0
 ```
 
 Manual publish of an existing wheelhouse:
 
 ```bash
-BASE="https://github.com/augmem/cortext.py/releases/download/v1.2.4"
-python3 scripts/write_wheel_index.py dist/wheels --version 1.2.4 --base-url "$BASE"
-gh release create v1.2.4 dist/wheels/*.whl dist/wheels/index.html \
+BASE="https://github.com/augmem/cortext.py/releases/download/v1.3.0"
+python3 scripts/write_wheel_index.py dist/wheels --version 1.3.0 --base-url "$BASE"
+gh release create v1.3.0 dist/wheels/*.whl dist/wheels/index.html \
   dist/wheels/install.sh dist/wheels/INSTALL.md \
-  --title "cortext.py 1.2.4" --notes-file dist/wheels/INSTALL.md
+  --title "cortext.py 1.3.0" --notes-file dist/wheels/INSTALL.md
 ```
 
 ## API

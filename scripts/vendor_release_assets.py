@@ -6,7 +6,7 @@ Downloads ``cortext-assets-<version>.tar.gz`` from augmem/cortext and installs
 
 Examples:
   python3 scripts/vendor_release_assets.py
-  python3 scripts/vendor_release_assets.py --from-release v1.2.4 --force
+  python3 scripts/vendor_release_assets.py --from-release v1.3.0 --force
 """
 from __future__ import annotations
 

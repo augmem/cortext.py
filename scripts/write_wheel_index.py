@@ -10,10 +10,10 @@ When --base-url is set, all links are absolute (required for GitHub Releases
 assets, since the index is itself a release asset).
 
 Examples:
-  python3 scripts/write_wheel_index.py dist/wheels --version 1.2.4
+  python3 scripts/write_wheel_index.py dist/wheels --version 1.3.0
   python3 scripts/write_wheel_index.py dist/wheels \\
-    --version 1.2.4 \\
-    --base-url https://github.com/augmem/cortext.py/releases/download/v1.2.4
+    --version 1.3.0 \\
+    --base-url https://github.com/augmem/cortext.py/releases/download/v1.3.0
 """
 from __future__ import annotations
 
