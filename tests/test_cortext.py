@@ -191,6 +191,51 @@ def test_process_text_with_media_forwards_binary_bytes_and_mimetype():
     }
 
 
+def test_mixed_memory_returns_every_payload_with_its_mimetype(tmp_path):
+    import base64
+
+    import cortext
+    from cortext.model import clear_materialize_cache
+
+    os.environ["CORTEXT_MODEL_CACHE_DIR"] = str(tmp_path / "engine-cache-mixed")
+    clear_materialize_cache()
+    photo = b"\xff\xd8\xff\xe0fake-jpeg\xff\xd9"
+    try:
+        with cortext.Cortext(str(tmp_path / "mixed.db")) as engine:
+            # One turn = one source: a text signal and its photo, as peers.
+            engine.process_text(
+                "The parking garage ticket says level 4 spot 27.",
+                "chat/user/turn1",
+                retention=cortext.Retention.NATURAL,
+            )
+            engine.process_image_with_media(
+                bytes([128]) * (8 * 8 * 3), 8, 8, 3, "chat/user/turn1",
+                photo, "image/jpeg", retention=cortext.Retention.DURABLE,
+            )
+            ctx = engine.process_text(
+                "parking garage level spot",
+                "query/public",
+                retention=cortext.Retention.EPHEMERAL,
+            )
+        mixed = [
+            m
+            for m in ctx["retrieved_memory"] + ctx["working_memory"]
+            if m["modality"] == "mixed"
+        ]
+        assert mixed, [m["modality"] for m in ctx["retrieved_memory"]]
+        for memory in mixed:
+            mimes = [c["mimetype"] for c in memory["content"]]
+            assert sorted(mimes) == ["image/jpeg", "text/plain"]
+            blobs = {
+                c["mimetype"]: base64.b64decode(c["base64"])
+                for c in memory["content"]
+            }
+            assert blobs["image/jpeg"] == photo
+    finally:
+        os.environ.pop("CORTEXT_MODEL_CACHE_DIR", None)
+        clear_materialize_cache()
+
+
 def test_embedding_length_stable(tmp_path):
     import cortext
     from cortext.model import clear_materialize_cache

@@ -73,6 +73,11 @@ with cortext.Cortext(":memory:") as memory:
 For binary attachments, pass `Media(data, mimetype)` or raw bytes with
 `media_mimetype` to `process_text_with_media`.
 
+Each memory in `retrieved_memory` / `working_memory` carries `content`: every
+signal payload of the memory as `{size_bytes, mimetype, base64}`, in signal
+order. `modality` is the modality its signals share, or `"mixed"` when they
+differ (for example a turn's text and the photo sent with it under one source).
+
 Python 3.10+. Binding **1.3.0** tracks engine **v1.3.0**.
 
 ## Distribution channels
