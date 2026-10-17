@@ -72,7 +72,6 @@ class Config:
     affect_interrupt: bool = True
     affect_retrieval: bool = True
     reinforcement_enabled: bool = True
-    procedural_enabled: bool = True
     sequential_edges_enabled: bool = True
     signal_filter_audio_enabled: bool = True
     signal_filter_image_enabled: bool = True
@@ -94,7 +93,6 @@ class _NativeConfig(ctypes.Structure):
         ("affect_interrupt", ctypes.c_int),
         ("affect_retrieval", ctypes.c_int),
         ("reinforcement_enabled", ctypes.c_int),
-        ("procedural_enabled", ctypes.c_int),
         ("sequential_edges_enabled", ctypes.c_int),
         ("signal_filter_audio_enabled", ctypes.c_int),
         ("signal_filter_image_enabled", ctypes.c_int),
@@ -1042,7 +1040,6 @@ class Cortext:
             native_cfg.affect_interrupt = _bool_to_int(config.affect_interrupt)
             native_cfg.affect_retrieval = _bool_to_int(config.affect_retrieval)
             native_cfg.reinforcement_enabled = _bool_to_int(config.reinforcement_enabled)
-            native_cfg.procedural_enabled = _bool_to_int(config.procedural_enabled)
             native_cfg.sequential_edges_enabled = _bool_to_int(config.sequential_edges_enabled)
             native_cfg.signal_filter_audio_enabled = _bool_to_int(
                 config.signal_filter_audio_enabled
