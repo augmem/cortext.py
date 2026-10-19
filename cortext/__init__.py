@@ -114,6 +114,7 @@ class _NativeProcessJsonOptions(ctypes.Structure):
         ("include_embedding", ctypes.c_int),
         ("retention", ctypes.c_int),
         ("reserved", ctypes.c_int),
+        ("evidence_budget_bytes", ctypes.c_size_t),
     ]
 
 
@@ -657,15 +658,32 @@ def _validate_image_buffer(
         raise ValueError("image buffer is smaller than width * height * channels")
 
 
+def _coerce_evidence_budget(evidence_budget_bytes: int | None) -> int:
+    """None means unset (whole memories); otherwise a positive byte count."""
+    if evidence_budget_bytes is None:
+        return 0
+    if isinstance(evidence_budget_bytes, bool) or not isinstance(
+        evidence_budget_bytes, int
+    ):
+        raise TypeError("evidence_budget_bytes must be an int or None")
+    if evidence_budget_bytes <= 0:
+        raise ValueError("evidence_budget_bytes must be positive")
+    if evidence_budget_bytes > ctypes.c_size_t(-1).value:
+        raise ValueError("evidence_budget_bytes exceeds the native size_t range")
+    return evidence_budget_bytes
+
+
 def _native_process_json_options(
     include_embedding: bool,
     retention: Retention | int | None = None,
+    evidence_budget_bytes: int | None = None,
 ) -> _NativeProcessJsonOptions:
     return _NativeProcessJsonOptions(
         ctypes.sizeof(_NativeProcessJsonOptions),
         1 if include_embedding else 0,
         _coerce_retention(retention),
         0,
+        _coerce_evidence_budget(evidence_budget_bytes),
     )
 
 
@@ -1134,8 +1152,11 @@ class Cortext:
         source_id: str,
         include_embedding: bool = True,
         retention: Retention | int | None = None,
+        evidence_budget_bytes: int | None = None,
     ) -> str:
-        options = _native_process_json_options(include_embedding, retention)
+        options = _native_process_json_options(
+            include_embedding, retention, evidence_budget_bytes
+        )
         return self._call_json(
             self._lib.cortext_process_text_json_with_options,
             text.encode("utf-8"),
@@ -1149,10 +1170,12 @@ class Cortext:
         source_id: str,
         include_embedding: bool = True,
         retention: Retention | int | None = None,
+        evidence_budget_bytes: int | None = None,
     ) -> dict[str, Any]:
         return json.loads(
             self.process_text_json(
-                text, source_id, include_embedding, retention
+                text, source_id, include_embedding, retention,
+                evidence_budget_bytes,
             )
         )
 
@@ -1164,6 +1187,7 @@ class Cortext:
         media_mimetype: str | None = None,
         include_embedding: bool = True,
         retention: Retention | int | None = None,
+        evidence_budget_bytes: int | None = None,
     ) -> str:
         if not getattr(self._lib, "_cortext_text_media_json_available", False):
             raise RuntimeError(
@@ -1172,7 +1196,9 @@ class Cortext:
         native_media, media_buffer, mimetype_buffer = _native_media(
             media, media_mimetype
         )
-        options = _native_process_json_options(include_embedding, retention)
+        options = _native_process_json_options(
+            include_embedding, retention, evidence_budget_bytes
+        )
         _ = (media_buffer, mimetype_buffer)
         return self._call_json(
             self._lib.cortext_process_text_with_media_json_with_options,
@@ -1190,6 +1216,7 @@ class Cortext:
         media_mimetype: str | None = None,
         include_embedding: bool = True,
         retention: Retention | int | None = None,
+        evidence_budget_bytes: int | None = None,
     ) -> dict[str, Any]:
         return json.loads(
             self.process_text_with_media_json(
@@ -1199,6 +1226,7 @@ class Cortext:
                 media_mimetype,
                 include_embedding,
                 retention,
+                evidence_budget_bytes,
             )
         )
 
@@ -1217,10 +1245,13 @@ class Cortext:
         source_id: str,
         include_embedding: bool = True,
         retention: Retention | int | None = None,
+        evidence_budget_bytes: int | None = None,
     ) -> str:
         samples = array("f", pcm)
         raw = (ctypes.c_float * len(samples)).from_buffer(samples)
-        options = _native_process_json_options(include_embedding, retention)
+        options = _native_process_json_options(
+            include_embedding, retention, evidence_budget_bytes
+        )
         return self._call_json(
             self._lib.cortext_process_audio_json_with_options,
             raw,
@@ -1237,13 +1268,16 @@ class Cortext:
         media_mimetype: str | None = None,
         include_embedding: bool = True,
         retention: Retention | int | None = None,
+        evidence_budget_bytes: int | None = None,
     ) -> str:
         samples = array("f", pcm)
         raw = (ctypes.c_float * len(samples)).from_buffer(samples)
         native_media, media_buffer, mimetype_buffer = _native_media(
             media, media_mimetype
         )
-        options = _native_process_json_options(include_embedding, retention)
+        options = _native_process_json_options(
+            include_embedding, retention, evidence_budget_bytes
+        )
         _ = (media_buffer, mimetype_buffer)
         return self._call_json(
             self._lib.cortext_process_audio_with_media_json_with_options,
@@ -1260,10 +1294,12 @@ class Cortext:
         source_id: str,
         include_embedding: bool = True,
         retention: Retention | int | None = None,
+        evidence_budget_bytes: int | None = None,
     ) -> dict[str, Any]:
         return json.loads(
             self.process_audio_json(
-                pcm, source_id, include_embedding, retention
+                pcm, source_id, include_embedding, retention,
+                evidence_budget_bytes,
             )
         )
 
@@ -1275,6 +1311,7 @@ class Cortext:
         media_mimetype: str | None = None,
         include_embedding: bool = True,
         retention: Retention | int | None = None,
+        evidence_budget_bytes: int | None = None,
     ) -> dict[str, Any]:
         return json.loads(
             self.process_audio_with_media_json(
@@ -1284,6 +1321,7 @@ class Cortext:
                 media_mimetype,
                 include_embedding,
                 retention,
+                evidence_budget_bytes,
             )
         )
 
@@ -1308,11 +1346,14 @@ class Cortext:
         source_id: str,
         include_embedding: bool = True,
         retention: Retention | int | None = None,
+        evidence_budget_bytes: int | None = None,
     ) -> str:
         blob = bytes(data)
         _validate_image_buffer(blob, width, height, channels)
         raw = (ctypes.c_uint8 * len(blob)).from_buffer_copy(blob)
-        options = _native_process_json_options(include_embedding, retention)
+        options = _native_process_json_options(
+            include_embedding, retention, evidence_budget_bytes
+        )
         return self._call_json(
             self._lib.cortext_process_image_json_with_options,
             raw,
@@ -1334,6 +1375,7 @@ class Cortext:
         media_mimetype: str | None = None,
         include_embedding: bool = True,
         retention: Retention | int | None = None,
+        evidence_budget_bytes: int | None = None,
     ) -> str:
         blob = bytes(data)
         _validate_image_buffer(blob, width, height, channels)
@@ -1341,7 +1383,9 @@ class Cortext:
         native_media, media_buffer, mimetype_buffer = _native_media(
             media, media_mimetype
         )
-        options = _native_process_json_options(include_embedding, retention)
+        options = _native_process_json_options(
+            include_embedding, retention, evidence_budget_bytes
+        )
         _ = (media_buffer, mimetype_buffer)
         return self._call_json(
             self._lib.cortext_process_image_with_media_json_with_options,
@@ -1363,6 +1407,7 @@ class Cortext:
         source_id: str,
         include_embedding: bool = True,
         retention: Retention | int | None = None,
+        evidence_budget_bytes: int | None = None,
     ) -> dict[str, Any]:
         return json.loads(
             self.process_image_json(
@@ -1373,6 +1418,7 @@ class Cortext:
                 source_id,
                 include_embedding,
                 retention,
+                evidence_budget_bytes,
             )
         )
 
@@ -1387,6 +1433,7 @@ class Cortext:
         media_mimetype: str | None = None,
         include_embedding: bool = True,
         retention: Retention | int | None = None,
+        evidence_budget_bytes: int | None = None,
     ) -> dict[str, Any]:
         return json.loads(
             self.process_image_with_media_json(
@@ -1399,6 +1446,7 @@ class Cortext:
                 media_mimetype,
                 include_embedding,
                 retention,
+                evidence_budget_bytes,
             )
         )
 

@@ -73,7 +73,28 @@ with cortext.Cortext(":memory:") as memory:
 For binary attachments, pass `Media(data, mimetype)` or raw bytes with
 `media_mimetype` to `process_text_with_media`.
 
-Each memory in `retrieved_memory` / `working_memory` carries `content`: every
+A query context leads with `standing_memory` (standing directives such as
+"Always ...", outside the retrieved ranking; show it ahead of
+`retrieved_memory` and do not count it against a cut of the retrieved list),
+then `retrieved_memory`.
+
+Every `process_*` call takes `evidence_budget_bytes`: `None` (default) returns
+recalled memories whole; a positive byte count fits `standing_memory` plus
+`retrieved_memory` (with attached neighbours) within it, text counted by its
+UTF-8 bytes and other payloads as 480 bytes each. Grouped memories keep their
+members most similar to the query, and more distinct memories are kept
+trimmed before lower-ranked ones are left out. Convert a token budget with
+your reader's tokenizer rate (8,000 tokens at 4.35 chars/token is 34,800).
+
+```python
+ctx = memory.process_text(
+    "When is the marathon long run?", "query/main",
+    retention=cortext.Retention.EPHEMERAL, evidence_budget_bytes=34_800,
+)
+evidence = ctx["standing_memory"] + ctx["retrieved_memory"]
+```
+
+Each memory in `standing_memory` / `retrieved_memory` / `working_memory` carries `content`: every
 signal payload of the memory as `{size_bytes, mimetype, base64}`, in signal
 order. `modality` is the modality its signals share, or `"mixed"` when they
 differ (for example a turn's text and the photo sent with it under one source).

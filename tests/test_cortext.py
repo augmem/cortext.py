@@ -236,6 +236,75 @@ def test_mixed_memory_returns_every_payload_with_its_mimetype(tmp_path):
         clear_materialize_cache()
 
 
+def test_process_json_options_carry_the_evidence_budget():
+    import ctypes
+
+    import cortext
+
+    unset = cortext._native_process_json_options(True)
+    assert unset.struct_size == ctypes.sizeof(cortext._NativeProcessJsonOptions)
+    assert unset.evidence_budget_bytes == 0
+    budgeted = cortext._native_process_json_options(
+        False, cortext.Retention.EPHEMERAL, 34_800
+    )
+    assert budgeted.evidence_budget_bytes == 34_800
+    assert budgeted.retention == int(cortext.Retention.EPHEMERAL)
+    for bad in (0, -1):
+        with pytest.raises(ValueError):
+            cortext._native_process_json_options(True, None, bad)
+    with pytest.raises(TypeError):
+        cortext._native_process_json_options(True, None, 1.5)
+
+
+def test_evidence_budget_bounds_standing_and_retrieved(tmp_path):
+    import base64
+
+    import cortext
+    from cortext.model import clear_materialize_cache
+
+    os.environ["CORTEXT_MODEL_CACHE_DIR"] = str(tmp_path / "engine-cache-budget")
+    clear_materialize_cache()
+
+    def evidence(ctx):
+        return sum(
+            len(base64.b64decode(c["base64"]))
+            if c["mimetype"].startswith("text/")
+            else 480
+            for m in ctx["standing_memory"] + ctx["retrieved_memory"]
+            for c in m["content"]
+        )
+
+    try:
+        with cortext.Cortext(str(tmp_path / "budget.db")) as engine:
+            engine.process_text(
+                "Always answer with the departure pier.", "chat/rules",
+                retention=cortext.Retention.DURABLE,
+            )
+            for i in range(6):
+                engine.process_text(
+                    f"The ferry to the island leaves at {6 + i} from pier four.",
+                    f"chat/ferry/{i}",
+                    retention=cortext.Retention.DURABLE,
+                )
+            query = "When does the ferry leave?"
+            whole = engine.process_text(
+                query, "query/public", retention=cortext.Retention.EPHEMERAL
+            )
+            assert "standing_memory" in whole
+            assert len(whole["retrieved_memory"]) >= 2
+            budget = evidence(whole) // 2
+            budgeted = engine.process_text(
+                query, "query/public",
+                retention=cortext.Retention.EPHEMERAL,
+                evidence_budget_bytes=budget,
+            )
+        assert evidence(budgeted) <= budget
+        assert len(budgeted["retrieved_memory"]) < len(whole["retrieved_memory"])
+    finally:
+        os.environ.pop("CORTEXT_MODEL_CACHE_DIR", None)
+        clear_materialize_cache()
+
+
 def test_embedding_length_stable(tmp_path):
     import cortext
     from cortext.model import clear_materialize_cache
