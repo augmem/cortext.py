@@ -1,12 +1,11 @@
 # Changelog
 
-## Unreleased
+## 2.0.0 - 2026-10-20
 
-Tracks cortext.cpp `main` (engine v5, per-blob content timestamps and
-reference-time retrieval). **Requires the next engine release**: no engine
-release contains these features yet, so the package version and the pinned
-engine (`v1.3.0`) are unchanged, and these features need a native built from
-cortext.cpp `main` (point `CORTEXT_LIBRARY_PATH` at it).
+Tracks engine **v2.0.0** (engine v5, per-blob content timestamps and
+reference-time retrieval) and **requires engine v2.0.0**: the C ABI changed,
+so 1.x natives must not be used with this binding. The package version follows
+the engine major.
 
 ### Breaking
 
@@ -45,10 +44,11 @@ cortext.cpp `main` (point `CORTEXT_LIBRARY_PATH` at it).
   `CORTEXT_LI_MODEL_PATH` (`~` expanded; a missing path fails fast).
   `resolve_li_model()` reports the path the engine will load. The package
   models tree vendors the engine's LI shard and manifest entry; the next
-  engine release's asset tarball must carry them too, since CI and release
-  builds re-vendor `models/` from it.
-- Tests: engine-v5 behavior tests skip when the loaded native predates it
-  (`CORTEXT_REQUIRE_ENGINE_V5=1` turns the skip into a failure).
+  engine v2.0.0 asset tarball carries the same shard and manifest entry, which
+  CI and release builds re-vendor `models/` from.
+- Tests: engine-v5 behavior tests skip when the loaded native predates it;
+  `CORTEXT_REQUIRE_ENGINE_V5=1` (set in CI) turns the skip into a failure.
+- Engine pin moves to `v2.0.0` (release assets, LI download source).
 
 ## 1.3.0
 

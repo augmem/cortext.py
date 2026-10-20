@@ -9,9 +9,9 @@ with embedded model chunks remain available on GitHub Releases.
 ## Install from PyPI
 
 ```bash
-pip install augmem.cortext==1.3.0
+pip install augmem.cortext==2.0.0
 # or
-uv pip install augmem.cortext==1.3.0
+uv pip install augmem.cortext==2.0.0
 ```
 
 The first `Cortext` instance downloads and verifies the AIST model, its
@@ -23,7 +23,7 @@ with `AIST-87M-LI.gguf` in the same directory or `CORTEXT_LI_MODEL_PATH` set.
 
 ```bash
 # Replace version as needed
-export CORTEXT_VERSION=1.3.0
+export CORTEXT_VERSION=2.0.0
 export CORTEXT_INDEX="https://github.com/augmem/cortext.py/releases/download/v${CORTEXT_VERSION}/index.html"
 
 pip install "augmem.cortext==${CORTEXT_VERSION}" --find-links "${CORTEXT_INDEX}"
@@ -47,14 +47,14 @@ internal index:
 ```bash
 tar -xzf simple-index.tar.gz
 # serve the extracted simple/ directory, then:
-pip install augmem.cortext==1.3.0 --index-url https://your-mirror.example/simple/
+pip install augmem.cortext==2.0.0 --index-url https://your-mirror.example/simple/
 ```
 
 ### Local wheelhouse / editable checkout
 
 ```bash
 # After scripts/build_wheels.py
-pip install augmem.cortext==1.3.0 --find-links dist/wheels --no-index
+pip install augmem.cortext==2.0.0 --find-links dist/wheels --no-index
 
 # Dev monorepo (all six natives in-tree)
 uv sync
@@ -132,10 +132,8 @@ signal order, where `timestamp` is that payload's time in ms (0 = unknown).
 differ (for example a turn's text and the photo sent with it under one source);
 the memory's own `mimetype` is that of its first signal.
 
-Python 3.10+. Binding **1.3.0** tracks engine **v1.3.0**. The standing
-memory block, evidence budget, mixed memories, per-content timestamps and
-reference time need a native built from cortext.cpp `main` until the next
-engine release (point `CORTEXT_LIBRARY_PATH` at it); see `CHANGELOG.md`.
+Python 3.10+. Binding **2.0.0** tracks engine **v2.0.0** (the C ABI changed
+from 1.x; see `CHANGELOG.md`).
 
 ## Distribution channels
 
@@ -152,7 +150,7 @@ GitHub Release wheels are larger but work offline after download.
 Local full tree after clone:
 
 ```bash
-python3 scripts/vendor_release_assets.py --from-release v1.3.0 --force
+python3 scripts/vendor_release_assets.py --from-release v2.0.0 --force
 uv sync && uv run pytest -q
 ```
 
@@ -208,18 +206,18 @@ resolves the packaged model first, which may reassemble or download it). A
 
 ```bash
 # 1) Vendor engine assets (or rely on CI to fetch augmem/cortext release)
-python3 scripts/vendor_release_assets.py --from-release v1.3.0 --force
+python3 scripts/vendor_release_assets.py --from-release v2.0.0 --force
 
 # 2) Build platform wheels + local indexes
 python3 scripts/build_wheels.py
 
 # 3) Build the PyPI package from thin natives
-python3 scripts/build_pypi.py --native-root /path/to/cortext-thin-v1.3-build
+python3 scripts/build_pypi.py --native-root /path/to/cortext-thin-v2.0-build
 
 # 4) Tag + push — CI (.github/workflows/release-wheels.yml) builds, writes
 #    absolute-URL indexes, and uploads everything to the GitHub Release
-git tag v1.3.0
-git push origin v1.3.0
+git tag v2.0.0
+git push origin v2.0.0
 
 # 5) Upload dist/pypi/* to PyPI with a configured API token
 ```
@@ -227,11 +225,11 @@ git push origin v1.3.0
 Manual publish of an existing wheelhouse:
 
 ```bash
-BASE="https://github.com/augmem/cortext.py/releases/download/v1.3.0"
-python3 scripts/write_wheel_index.py dist/wheels --version 1.3.0 --base-url "$BASE"
-gh release create v1.3.0 dist/wheels/*.whl dist/wheels/index.html \
+BASE="https://github.com/augmem/cortext.py/releases/download/v2.0.0"
+python3 scripts/write_wheel_index.py dist/wheels --version 2.0.0 --base-url "$BASE"
+gh release create v2.0.0 dist/wheels/*.whl dist/wheels/index.html \
   dist/wheels/install.sh dist/wheels/INSTALL.md \
-  --title "cortext.py 1.3.0" --notes-file dist/wheels/INSTALL.md
+  --title "cortext.py 2.0.0" --notes-file dist/wheels/INSTALL.md
 ```
 
 ## API
