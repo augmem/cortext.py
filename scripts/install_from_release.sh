@@ -3,8 +3,8 @@
 #
 # Usage:
 #   ./scripts/install_from_release.sh              # version from pyproject / latest tag
-#   ./scripts/install_from_release.sh v1.3.0
-#   CORTEXT_PY_REPO=augmem/cortext.py ./scripts/install_from_release.sh v1.3.0
+#   ./scripts/install_from_release.sh v2.0.0
+#   CORTEXT_PY_REPO=augmem/cortext.py ./scripts/install_from_release.sh v2.0.0
 #
 # Env:
 #   CORTEXT_PY_REPO   GitHub owner/repo (default: augmem/cortext.py)

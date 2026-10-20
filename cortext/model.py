@@ -43,11 +43,11 @@ _VOCAB_URL = (
 _VOCAB_SHA256 = "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
 _VOCAB_SIZE = 231508
 # The reranker is not on the Hugging Face model repo; it ships as a Git shard
-# in augmem/cortext.cpp. Pinned to an immutable commit and verified by size
+# in augmem/cortext.cpp. Pinned to the engine v2.0.0 tag and verified by size
 # and SHA-256 (its single shard is the whole file).
 _LI_MODEL_URL = (
     "https://raw.githubusercontent.com/augmem/cortext.cpp/"
-    "f0b681e97450a4955458d0f4b140f58d15bba650/"
+    "v2.0.0/"
     "models/AIST-87M-GGUF/chunks/AIST-87M-LI.gguf.part-000"
 )
 _LI_MODEL_SHA256 = "e5fc69ab84fbfe826a4730346b9a9315f12dc1e11767c66d5bc38557ef4290a4"
@@ -134,7 +134,7 @@ def _download_verified(url: str, dest: Path, sha256: str, size: int) -> None:
     tmp = Path(tmp_name)
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": "augmem.cortext/1.3.0 model bootstrap"},
+        headers={"User-Agent": "augmem.cortext/2.0.0 model bootstrap"},
     )
     try:
         with urllib.request.urlopen(request, timeout=_DOWNLOAD_TIMEOUT_SECONDS) as response:

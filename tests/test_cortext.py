@@ -31,10 +31,9 @@ def _clear_override_env():
 def engine_v5(tmp_path_factory):
     """Skip engine-v5 behavior tests when the loaded native predates it.
 
-    The pinned release natives (v1.3.0) lack the standing_memory block,
-    per-content timestamps and reference-time retrieval; those need a native
-    built from cortext.cpp main (point CORTEXT_LIBRARY_PATH at it). Set
-    CORTEXT_REQUIRE_ENGINE_V5=1 to fail instead of skip.
+    Natives before engine v2.0.0 lack the standing_memory block, per-content
+    timestamps and reference-time retrieval. CI sets CORTEXT_REQUIRE_ENGINE_V5=1
+    so a native without them fails instead of skipping.
     """
     import cortext
     from cortext.model import clear_materialize_cache

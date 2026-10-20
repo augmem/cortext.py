@@ -1,6 +1,6 @@
 {
   "schema": "augmem.cortext.release_assets.v1",
-  "cortext_version": "1.3.0",
+  "cortext_version": "2.0.0",
   "optimize": "ReleaseSmall",
   "layout": {
     "native": "native/",
@@ -14,49 +14,49 @@
         "package_tag": "linux-x86_64",
         "zig_target": "x86_64-linux-gnu.2.17",
         "artifact": "libcortext.so",
-        "size": 147332704,
-        "sha256": "00cf570bd240722bade4fdc78ed2bbdddfb0a88ef0a1b5e0f123358a5cbc5033"
+        "size": 147661648,
+        "sha256": "f390fe210f9205cfefe4e7dcef42b05e0bfd3dd27526282c0a04c2cfaa2e69e4"
       },
       {
         "package_tag": "linux-aarch64",
         "zig_target": "aarch64-linux-gnu.2.17",
         "artifact": "libcortext.so",
-        "size": 147088680,
-        "sha256": "87a60920ce57a1683a45a3c9fb0dc72fb7333fe32533a4f7d566e0737a943a54"
+        "size": 147440960,
+        "sha256": "50355ab12eb3dc214b983a7b077da89cadff04830392dcfacf0e96de76ca3110"
       },
       {
         "package_tag": "macos-x86_64",
         "zig_target": "x86_64-macos",
         "artifact": "libcortext.dylib",
-        "size": 146886576,
-        "sha256": "a29d01917ae7d0fca3622ffaf57a43fbe85da1093792866692e8080d1312b2fe"
+        "size": 147207569,
+        "sha256": "b5452f920ef30297970be2df9b0132d2373bae82eebe3d1df9955b6a00271ba5"
       },
       {
         "package_tag": "macos-aarch64",
         "zig_target": "aarch64-macos",
         "artifact": "libcortext.dylib",
-        "size": 147373336,
-        "sha256": "edfd5b7d444a749f15f810aed47d7f4cb3e20c9b05dae357713b7eed95ea27b8"
+        "size": 147753032,
+        "sha256": "136a8247eb3ea74d7be453d003e4fd9b53934c4e655e9d248218c7b62c36b111"
       },
       {
         "package_tag": "windows-x86_64",
         "zig_target": "x86_64-windows-gnu",
         "artifact": "cortext.dll",
-        "size": 145932288,
-        "sha256": "1ce730902e97dfdca32535f5a5a9f2bec57be48f6e27d3f673d9956b0a197689"
+        "size": 146322432,
+        "sha256": "76da57acbd8a45ee4ce886d6223caa8336f5c63121368c5227a4673dac821192"
       },
       {
         "package_tag": "windows-aarch64",
         "zig_target": "aarch64-windows-gnu",
         "artifact": "cortext.dll",
-        "size": 145532416,
-        "sha256": "2184ed06179b040c96d3358e84c9c4cc70c029ec768f2960cb4e41062dd08587"
+        "size": 145952256,
+        "sha256": "961eaab5470a7dbac0309cc09b9fac320aecbc5efb75c6e11c3876a79e9e15ff"
       }
     ]
   },
   "models": {
     "schema": "augmem.cortext.models.v1",
-    "cortext_version": "1.3.0",
+    "cortext_version": "2.0.0",
     "note": "AIST models are Git-chunked under 100 MiB so they can live in ordinary Git without LFS. Language bindings reassemble and checksum on first use; do not re-shard in binding repos \u2014 copy this tree from cortext.",
     "assets": [
       {

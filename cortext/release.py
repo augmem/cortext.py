@@ -18,7 +18,7 @@ from pathlib import Path
 
 from .assets import PACKAGE_DIR, host_native_present, platform_tag
 
-DEFAULT_RELEASE_TAG = os.environ.get("CORTEXT_RELEASE_TAG", "v1.3.0")
+DEFAULT_RELEASE_TAG = os.environ.get("CORTEXT_RELEASE_TAG", "v2.0.0")
 DEFAULT_RELEASE_REPO = os.environ.get("CORTEXT_RELEASE_REPO", "augmem/cortext.cpp")
 
 
@@ -53,7 +53,7 @@ def _download(url: str, dest: Path) -> None:
 def _normalize_tag(tag: str | None) -> tuple[str, str]:
     raw = tag or DEFAULT_RELEASE_TAG
     if raw.upper() == "LATEST":
-        raise RuntimeError("pin an exact release tag (e.g. v1.3.0); latest is not allowed")
+        raise RuntimeError("pin an exact release tag (e.g. v2.0.0); latest is not allowed")
     t = raw if raw.startswith("v") else f"v{raw}"
     return t, t.lstrip("v")
 
