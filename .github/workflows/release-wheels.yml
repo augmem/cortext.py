@@ -106,7 +106,7 @@ jobs:
               assert "py3-none-any" not in w.name, w.name
               print(f"{w.name} {w.stat().st_size/1024/1024:.1f} MiB")
           assert (Path("dist/wheels") / "index.html").is_file()
-          assert (Path("dist/wheels") / "simple" / "cortext" / "index.html").is_file()
+          assert (Path("dist/wheels") / "simple" / "augmem-cortext" / "index.html").is_file()
           print("ok")
           PY
 
@@ -124,7 +124,7 @@ jobs:
           BODY="$(cat <<EOF
           ## cortext.py ${VERSION}
 
-          Platform wheels (turnkey natives + AIST model chunks) are attached to this release. The slim `augmem.cortext` package is published separately to pypi.org.
+          Platform wheels (turnkey natives + AIST model chunks) are attached to this release. The slim \`augmem.cortext\` package is published separately to pypi.org.
 
           ### Install
 
