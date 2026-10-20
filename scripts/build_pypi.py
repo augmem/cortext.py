@@ -127,6 +127,12 @@ def stage_tree(staging: Path, native_root: Path, version: str) -> list[Path]:
                     "download": "first engine creation",
                     "verification": "pinned sha256 and size",
                 },
+                "li_model": {
+                    "source": "https://github.com/augmem/cortext.cpp/tree/main/models/AIST-87M-GGUF/chunks",
+                    "download": "first engine creation, beside the AIST model",
+                    "verification": "pinned sha256 and size",
+                    "override": "CORTEXT_LI_MODEL_PATH",
+                },
             },
             indent=2,
         )

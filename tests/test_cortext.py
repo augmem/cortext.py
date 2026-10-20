@@ -617,3 +617,170 @@ def test_text_with_media_stores_caller_bytes_or_canonical_text(tmp_path):
     finally:
         os.environ.pop("CORTEXT_MODEL_CACHE_DIR", None)
         clear_materialize_cache()
+
+
+def _fake_models_tree(root, *, with_li=True, li_chunk_sha=None):
+    """A tiny models/ tree shaped like the engine's manifest.json."""
+    import hashlib
+    import json
+
+    def sha(data):
+        return hashlib.sha256(data).hexdigest()
+
+    aist = [b"aist-part-0|", b"aist-part-1"]
+    li = b"late-interaction-reranker"
+    vocab = b"[PAD]\n[UNK]\n"
+    chunks = root / "AIST-87M-GGUF" / "chunks"
+    chunks.mkdir(parents=True)
+    for i, part in enumerate(aist):
+        (chunks / f"AIST-87M_q8_0.gguf.part-{i:03d}").write_bytes(part)
+    (root / "mdbr-leaf-ir").mkdir()
+    (root / "mdbr-leaf-ir" / "vocab.txt").write_bytes(vocab)
+    assets = [
+        {
+            "filename": "AIST-87M-GGUF/AIST-87M_q8_0.gguf",
+            "sha256": sha(b"".join(aist)),
+            "size": len(b"".join(aist)),
+            "chunks": [
+                {
+                    "filename": f"AIST-87M-GGUF/chunks/AIST-87M_q8_0.gguf.part-{i:03d}",
+                    "sha256": sha(part),
+                }
+                for i, part in enumerate(aist)
+            ],
+        },
+        {"filename": "mdbr-leaf-ir/vocab.txt", "sha256": sha(vocab)},
+    ]
+    if with_li:
+        (chunks / "AIST-87M-LI.gguf.part-000").write_bytes(li)
+        assets.append(
+            {
+                "filename": "AIST-87M-GGUF/AIST-87M-LI.gguf",
+                "sha256": sha(li),
+                "size": len(li),
+                "chunks": [
+                    {
+                        "filename": "AIST-87M-GGUF/chunks/AIST-87M-LI.gguf.part-000",
+                        "sha256": li_chunk_sha or sha(li),
+                    }
+                ],
+            }
+        )
+    (root / "manifest.json").write_text(
+        json.dumps({"schema": "augmem.cortext.models.v1", "assets": assets})
+    )
+    return li
+
+
+def test_materialize_places_the_li_model_beside_aist(monkeypatch, tmp_path):
+    import cortext.model as model
+
+    models = tmp_path / "models"
+    li = _fake_models_tree(models)
+    cache = tmp_path / "cache"
+    monkeypatch.setattr(model, "models_root", lambda: models)
+    monkeypatch.setenv("CORTEXT_MODEL_CACHE_DIR", str(cache))
+    monkeypatch.delenv("CORTEXT_LI_MODEL_PATH", raising=False)
+    model.clear_materialize_cache()
+    try:
+        aist_path = Path(model.materialize_model())
+        li_path = aist_path.parent / "AIST-87M-LI.gguf"
+        assert li_path.read_bytes() == li
+        assert model.resolve_li_model() == str(li_path)
+    finally:
+        model.clear_materialize_cache()
+
+
+def test_materialize_rejects_a_corrupt_li_chunk(monkeypatch, tmp_path):
+    import cortext.model as model
+
+    models = tmp_path / "models"
+    _fake_models_tree(models, li_chunk_sha="0" * 64)
+    monkeypatch.setattr(model, "models_root", lambda: models)
+    monkeypatch.setenv("CORTEXT_MODEL_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.delenv("CORTEXT_LI_MODEL_PATH", raising=False)
+    model.clear_materialize_cache()
+    try:
+        with pytest.raises(RuntimeError, match="AIST-87M-LI"):
+            model.materialize_model()
+    finally:
+        model.clear_materialize_cache()
+
+
+def test_materialize_without_a_declared_li_asset_skips_it(monkeypatch, tmp_path):
+    """Engine releases before the reranker declare no LI asset."""
+    import cortext.model as model
+
+    models = tmp_path / "models"
+    _fake_models_tree(models, with_li=False)
+    monkeypatch.setattr(model, "models_root", lambda: models)
+    monkeypatch.setenv("CORTEXT_MODEL_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.delenv("CORTEXT_LI_MODEL_PATH", raising=False)
+    model.clear_materialize_cache()
+    try:
+        aist_path = Path(model.materialize_model())
+        assert aist_path.is_file()
+        assert not (aist_path.parent / "AIST-87M-LI.gguf").exists()
+    finally:
+        model.clear_materialize_cache()
+
+
+def test_li_model_path_override_wins_over_shipped_chunks(monkeypatch, tmp_path):
+    import cortext.model as model
+
+    models = tmp_path / "models"
+    _fake_models_tree(models, li_chunk_sha="0" * 64)  # would fail if read
+    override = tmp_path / "custom-LI.gguf"
+    override.write_bytes(b"caller-supplied reranker")
+    monkeypatch.setattr(model, "models_root", lambda: models)
+    monkeypatch.setenv("CORTEXT_MODEL_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setenv("CORTEXT_LI_MODEL_PATH", str(override))
+    model.clear_materialize_cache()
+    try:
+        aist_path = Path(model.materialize_model())
+        assert not (aist_path.parent / "AIST-87M-LI.gguf").exists()
+        assert model.resolve_li_model() == str(override)
+    finally:
+        model.clear_materialize_cache()
+
+
+def test_missing_li_model_path_override_fails_fast(monkeypatch, tmp_path):
+    import cortext
+
+    monkeypatch.setenv("CORTEXT_LI_MODEL_PATH", str(tmp_path / "missing-LI.gguf"))
+    with pytest.raises(cortext.CortextError, match="CORTEXT_LI_MODEL_PATH"):
+        cortext.Cortext(":memory:")
+
+
+def test_remote_bootstrap_downloads_the_li_model_beside_aist(monkeypatch, tmp_path):
+    import cortext.model as model
+
+    calls = []
+
+    def fake_download(url, dest, sha256, size):
+        calls.append((url, dest, sha256, size))
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"x")
+
+    monkeypatch.delenv("CORTEXT_LI_MODEL_PATH", raising=False)
+    monkeypatch.setattr(model, "_verified_file", lambda *_args: False)
+    monkeypatch.setattr(model, "_download_verified", fake_download)
+    aist_path = Path(model._remote_model_path(tmp_path))
+
+    by_url = {url: (dest, sha, size) for url, dest, sha, size in calls}
+    li_dest, li_sha, li_size = by_url[model._LI_MODEL_URL]
+    assert li_dest == aist_path.parent / "AIST-87M-LI.gguf"
+    assert li_sha == model._LI_MODEL_SHA256
+    assert li_size == model._LI_MODEL_SIZE
+    assert model._AIST_MODEL_URL in by_url
+
+
+def test_pinned_li_checksum_matches_the_engine_model():
+    """Runs when CORTEXT_LI_MODEL_PATH points at the engine's assembled LI."""
+    import cortext.model as model
+
+    path = os.environ.get("CORTEXT_LI_MODEL_PATH")
+    if not path or not Path(path).is_file():
+        pytest.skip("CORTEXT_LI_MODEL_PATH not set to an assembled LI model")
+    assert Path(path).stat().st_size == model._LI_MODEL_SIZE
+    assert model.sha256_file(Path(path)) == model._LI_MODEL_SHA256

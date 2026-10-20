@@ -20,8 +20,10 @@ from .assets import (
 )
 from .model import (
     clear_materialize_cache,
+    li_model_override as _li_model_override,
     materialize_model,
     resolve_aist_model,
+    resolve_li_model,
 )
 from .release import DEFAULT_RELEASE_TAG
 
@@ -41,6 +43,7 @@ __all__ = [
     "materialize_model",
     "package_assets_ready",
     "resolve_aist_model",
+    "resolve_li_model",
     "version",
 ]
 
@@ -1122,6 +1125,11 @@ class Cortext:
         self._object_provider_bridge = (
             _ObjectProviderBridge(object_store) if object_store is not None else None
         )
+        li_override = _li_model_override()
+        if li_override is not None and not li_override.is_file():
+            raise CortextError(
+                f"CORTEXT_LI_MODEL_PATH does not exist: {li_override}"
+            )
         had_model_env = "CORTEXT_AIST_MODEL_PATH" in os.environ
         previous_model_env = os.environ.get("CORTEXT_AIST_MODEL_PATH")
         # Stale/missing override: re-resolve from release assets.
