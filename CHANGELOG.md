@@ -42,8 +42,13 @@ cortext.cpp `main` (point `CORTEXT_LIBRARY_PATH` at it).
 - LI model: the binding reassembles `AIST-87M-LI.gguf` beside the AIST model
   from shipped chunks when the models manifest declares it, downloads the
   pinned, checksummed shard on the slim PyPI path, and honors
-  `CORTEXT_LI_MODEL_PATH` (a missing path fails fast). `resolve_li_model()`
-  reports the path the engine will load.
+  `CORTEXT_LI_MODEL_PATH` (`~` expanded; a missing path fails fast).
+  `resolve_li_model()` reports the path the engine will load. The package
+  models tree vendors the engine's LI shard and manifest entry; the next
+  engine release's asset tarball must carry them too, since CI and release
+  builds re-vendor `models/` from it.
+- Tests: engine-v5 behavior tests skip when the loaded native predates it
+  (`CORTEXT_REQUIRE_ENGINE_V5=1` turns the skip into a failure).
 
 ## 1.3.0
 

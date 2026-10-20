@@ -132,7 +132,10 @@ signal order, where `timestamp` is that payload's time in ms (0 = unknown).
 differ (for example a turn's text and the photo sent with it under one source);
 the memory's own `mimetype` is that of its first signal.
 
-Python 3.10+. Binding **1.3.0** tracks engine **v1.3.0**.
+Python 3.10+. Binding **1.3.0** tracks engine **v1.3.0**. The standing
+memory block, evidence budget, mixed memories, per-content timestamps and
+reference time need a native built from cortext.cpp `main` until the next
+engine release (point `CORTEXT_LIBRARY_PATH` at it); see `CHANGELOG.md`.
 
 ## Distribution channels
 
@@ -186,7 +189,10 @@ The late-interaction reranker resolves the way the engine looks for it:
 `CORTEXT_LI_MODEL_PATH`, else `AIST-87M-LI.gguf` beside the AIST model (the
 binding reassembles it there from the shipped chunks when the models manifest
 declares it, or downloads it on the PyPI path), else a reranker linked into the
-native library. `resolve_li_model()` returns the path that will be used.
+native library. `resolve_li_model()` returns the path the engine will load,
+looking beside `CORTEXT_AIST_MODEL_PATH` when that names a file (otherwise it
+resolves the packaged model first, which may reassemble or download it). A
+`~` in `CORTEXT_LI_MODEL_PATH` is expanded before the engine sees it.
 
 ## Environment (optional)
 
@@ -241,7 +247,9 @@ gh release create v1.3.0 dist/wheels/*.whl dist/wheels/index.html \
 uv sync
 uv run pytest -q
 
-# Against a locally built engine
+# Against a locally built engine (engine-v5 tests skip on older natives;
+# CORTEXT_REQUIRE_ENGINE_V5=1 makes that a failure)
+CORTEXT_REQUIRE_ENGINE_V5=1 \
 CORTEXT_LIBRARY_PATH=/path/to/libcortext.dylib \
 CORTEXT_LI_MODEL_PATH=/path/to/AIST-87M-LI.gguf \
 uv run pytest -q
