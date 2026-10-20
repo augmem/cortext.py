@@ -47,6 +47,9 @@ jobs:
           PY
 
       - name: Pytest (real native path)
+        env:
+          # The vendored engine release must run the engine-v5 tests, not skip them.
+          CORTEXT_REQUIRE_ENGINE_V5: "1"
         run: python -m pytest -q
 
       - name: Build host platform wheel

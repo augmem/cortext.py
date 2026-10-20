@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Curl-friendly entrypoint for release installs (uploaded as a release asset).
-# Usage: curl -fsSL …/install.sh | bash -s -- v1.3.0
+# Usage: curl -fsSL …/install.sh | bash -s -- v2.0.0
 set -euo pipefail
-TAG="${1:-v1.3.0}"
+TAG="${1:-v2.0.0}"
 REPO="${CORTEXT_PY_REPO:-augmem/cortext.py}"
 VERSION="${TAG#v}"
 BASE="https://github.com/${REPO}/releases/download/${TAG}"
