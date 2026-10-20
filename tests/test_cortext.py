@@ -27,6 +27,7 @@ def _clear_override_env():
     ct._LIB = None  # type: ignore[attr-defined]
 
 
+
 def test_package_ships_all_platform_natives_and_model_chunks():
     tags = [
         "linux-x86_64",
@@ -60,6 +61,9 @@ def test_package_ships_all_platform_natives_and_model_chunks():
         )
         assert part.is_file(), f"missing chunk {part}"
     assert (_PKG / "models" / "mdbr-leaf-ir" / "vocab.txt").is_file()
+    assert (
+        _PKG / "models" / "AIST-87M-GGUF" / "chunks" / "AIST-87M-LI.gguf.part-000"
+    ).is_file()
 
     pyproject = (_WORKSPACE / "pyproject.toml").read_text(encoding="utf-8")
     assert "native/**/*" in pyproject
@@ -102,6 +106,14 @@ def test_materialize_model_from_shipped_chunks(tmp_path):
             == "bf4c49954eccc65183f1a97e44606e86c7ee5a4fea500457124b687a3ec97898"
         )
         assert (cache / "mdbr-leaf-ir" / "vocab.txt").is_file()
+        li = path.parent / "AIST-87M-LI.gguf"
+        if os.environ.get("CORTEXT_LI_MODEL_PATH"):
+            assert not li.exists()
+        else:
+            assert li.stat().st_size == 410848
+            assert sha256_file(li) == (
+                "e5fc69ab84fbfe826a4730346b9a9315f12dc1e11767c66d5bc38557ef4290a4"
+            )
     finally:
         os.environ.pop("CORTEXT_MODEL_CACHE_DIR", None)
         clear_materialize_cache()
@@ -784,3 +796,72 @@ def test_pinned_li_checksum_matches_the_engine_model():
         pytest.skip("CORTEXT_LI_MODEL_PATH not set to an assembled LI model")
     assert Path(path).stat().st_size == model._LI_MODEL_SIZE
     assert model.sha256_file(Path(path)) == model._LI_MODEL_SHA256
+
+
+def test_materialize_memo_replaces_a_missing_li_model(monkeypatch, tmp_path):
+    import cortext.model as model
+
+    models = tmp_path / "models"
+    li = _fake_models_tree(models)
+    monkeypatch.setattr(model, "models_root", lambda: models)
+    monkeypatch.setenv("CORTEXT_MODEL_CACHE_DIR", str(tmp_path / "cache"))
+    model.clear_materialize_cache()
+    try:
+        # First call while an override names the reranker: nothing placed.
+        monkeypatch.setenv("CORTEXT_LI_MODEL_PATH", str(tmp_path / "custom-LI.gguf"))
+        li_path = Path(model.materialize_model()).parent / "AIST-87M-LI.gguf"
+        assert not li_path.exists()
+        # Override dropped: the memoized call must still place it.
+        monkeypatch.delenv("CORTEXT_LI_MODEL_PATH")
+        model.materialize_model()
+        assert li_path.read_bytes() == li
+        # Deleted after placement: placed again.
+        li_path.unlink()
+        model.materialize_model()
+        assert li_path.read_bytes() == li
+    finally:
+        model.clear_materialize_cache()
+
+
+def test_resolve_li_model_looks_beside_the_aist_model_in_effect(monkeypatch, tmp_path):
+    import cortext.model as model
+
+    aist = tmp_path / "custom" / "AIST.gguf"
+    aist.parent.mkdir()
+    aist.write_bytes(b"caller-supplied aist")
+    monkeypatch.delenv("CORTEXT_LI_MODEL_PATH", raising=False)
+    monkeypatch.setenv("CORTEXT_AIST_MODEL_PATH", str(aist))
+
+    def unexpected(*_args):
+        raise AssertionError("must not resolve a packaged model")
+
+    monkeypatch.setattr(model, "resolve_aist_model", unexpected)
+    assert model.resolve_li_model() is None
+    beside = aist.parent / "AIST-87M-LI.gguf"
+    beside.write_bytes(b"reranker")
+    assert model.resolve_li_model() == str(beside)
+
+
+def test_li_model_path_with_tilde_reaches_the_engine_expanded(monkeypatch, tmp_path):
+    import shutil
+
+    import cortext
+    from cortext.model import clear_materialize_cache, materialize_model
+
+    monkeypatch.setenv("CORTEXT_MODEL_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.delenv("CORTEXT_LI_MODEL_PATH", raising=False)
+    clear_materialize_cache()
+    try:
+        shipped_li = Path(materialize_model()).parent / "AIST-87M-LI.gguf"
+        home = tmp_path / "home"
+        home.mkdir()
+        shutil.copy2(shipped_li, home / "AIST-87M-LI.gguf")
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setenv("CORTEXT_LI_MODEL_PATH", "~/AIST-87M-LI.gguf")
+        assert cortext.resolve_li_model() == str(home / "AIST-87M-LI.gguf")
+        with cortext.Cortext(":memory:") as engine:
+            assert engine.embed_text("tilde path")
+        # The caller's raw value is restored after engine creation.
+        assert os.environ["CORTEXT_LI_MODEL_PATH"] == "~/AIST-87M-LI.gguf"
+    finally:
+        clear_materialize_cache()

@@ -28,7 +28,8 @@ LI_MODEL_ASSET_NAME = "AIST-87M-GGUF/AIST-87M-LI.gguf"
 LI_MODEL_ENV = "CORTEXT_LI_MODEL_PATH"
 
 _materialize_lock = threading.Lock()
-_materialized_cache: dict[str, str] = {}
+# cache_dir -> (AIST path, LI path the manifest places beside it or None)
+_materialized_cache: dict[str, tuple[str, str | None]] = {}
 
 _AIST_MODEL_URL = (
     "https://huggingface.co/augmem/AIST-87M-GGUF/resolve/main/"
@@ -162,7 +163,11 @@ def _download_verified(url: str, dest: Path, sha256: str, size: int) -> None:
 
 
 def li_model_override() -> Path | None:
-    """``CORTEXT_LI_MODEL_PATH`` when set (the engine reads it directly)."""
+    """``CORTEXT_LI_MODEL_PATH`` when set, with ``~`` expanded.
+
+    The engine reads the raw variable, so ``Cortext`` writes this expanded
+    path back into the environment for the duration of engine creation.
+    """
     value = os.environ.get(LI_MODEL_ENV)
     return Path(value).expanduser() if value else None
 
@@ -213,10 +218,16 @@ def _declared_model_asset(
 
 def _cached_materialized(cache_dir: Path) -> str | None:
     key = str(cache_dir)
-    path = _materialized_cache.get(key)
-    if not path:
+    entry = _materialized_cache.get(key)
+    if not entry:
         return None
-    if not Path(path).is_file():
+    path, li_path = entry
+    li_missing = (
+        li_path is not None
+        and li_model_override() is None
+        and not Path(li_path).is_file()
+    )
+    if not Path(path).is_file() or li_missing:
         _materialized_cache.pop(key, None)
         return None
     return path
@@ -255,36 +266,38 @@ def materialize_model(db_path: str = ":memory:") -> str:
         cached = _cached_materialized(cache_dir)
         if cached is not None:
             return cached
-        path = _materialize_model_locked(cache_dir)
-        _materialized_cache[str(cache_dir)] = path
+        path, li_path = _materialize_model_locked(cache_dir)
+        _materialized_cache[str(cache_dir)] = (path, li_path)
         return path
 
 
-def _materialize_model_locked(cache_dir: Path) -> str:
+def _materialize_model_locked(cache_dir: Path) -> tuple[str, str | None]:
     models = models_root()
     manifest = load_model_manifest(models)
     asset = find_model_asset(manifest, MODEL_ASSET_NAME)
     model_path = cache_dir / Path(MODEL_ASSET_NAME)
     ensure_vocab_in_cache(cache_dir, manifest, models)
     _reassemble_asset(models, asset, model_path)
-    _ensure_li_model_beside(model_path, manifest, models)
-    return os.fspath(model_path)
+    li_path = _ensure_li_model_beside(model_path, manifest, models)
+    return os.fspath(model_path), li_path
 
 
 def _ensure_li_model_beside(
     model_path: Path, manifest: dict[str, Any], models: Path
-) -> None:
+) -> str | None:
     """Reassemble the reranker beside AIST when the manifest declares it.
 
-    Skipped when ``CORTEXT_LI_MODEL_PATH`` names the reranker, and for engine
-    releases whose manifest predates it.
+    Returns where the manifest places it (``None`` for engine releases whose
+    manifest predates it). Placement is skipped while
+    ``CORTEXT_LI_MODEL_PATH`` names the reranker.
     """
-    if li_model_override() is not None:
-        return
     asset = _declared_model_asset(manifest, LI_MODEL_ASSET_NAME)
     if asset is None:
-        return
-    _reassemble_asset(models, asset, model_path.parent / Path(LI_MODEL_ASSET_NAME).name)
+        return None
+    li_path = model_path.parent / Path(LI_MODEL_ASSET_NAME).name
+    if li_model_override() is None:
+        _reassemble_asset(models, asset, li_path)
+    return os.fspath(li_path)
 
 
 def _reassemble_asset(models: Path, asset: dict[str, Any], dest: Path) -> None:
@@ -355,14 +368,30 @@ def resolve_li_model(db_path: str = ":memory:") -> str | None:
     """Path of the late-interaction reranker the engine will load.
 
     ``CORTEXT_LI_MODEL_PATH`` when set; otherwise ``AIST-87M-LI.gguf`` beside
-    the resolved AIST model, or ``None`` when no file sits there (the engine
-    then uses a reranker linked into the native library, if any).
+    the AIST model in effect (``CORTEXT_AIST_MODEL_PATH`` or the resolved
+    one, which may reassemble or download it), or ``None`` when no file sits
+    there (the engine then uses a reranker linked into the native library).
     """
     override = li_model_override()
     if override is not None:
         return os.fspath(override)
-    beside = Path(resolve_aist_model(db_path)).parent / Path(LI_MODEL_ASSET_NAME).name
+    beside = Path(aist_model_in_effect(db_path)).parent / Path(LI_MODEL_ASSET_NAME).name
     return os.fspath(beside) if beside.is_file() else None
+
+
+def aist_model_in_effect(db_path: str = ":memory:") -> str:
+    """The AIST model ``Cortext`` hands the engine.
+
+    ``CORTEXT_AIST_MODEL_PATH`` when it names an existing file, otherwise the
+    model resolved from shipped chunks or the verified cache (which may
+    reassemble or download it).
+    """
+    env = os.environ.get("CORTEXT_AIST_MODEL_PATH")
+    if env:
+        path = Path(env).expanduser()
+        if path.is_file():
+            return os.fspath(path)
+    return resolve_aist_model(db_path)
 
 
 def clear_materialize_cache(cache_dir: Path | str | None = None) -> None:

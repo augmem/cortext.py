@@ -1130,6 +1130,7 @@ class Cortext:
             raise CortextError(
                 f"CORTEXT_LI_MODEL_PATH does not exist: {li_override}"
             )
+        previous_li_env = os.environ.get("CORTEXT_LI_MODEL_PATH")
         had_model_env = "CORTEXT_AIST_MODEL_PATH" in os.environ
         previous_model_env = os.environ.get("CORTEXT_AIST_MODEL_PATH")
         # Stale/missing override: re-resolve from release assets.
@@ -1139,6 +1140,9 @@ class Cortext:
         default_model_path = None if had_model_env else _default_aist_model_path(db_path)
         if not had_model_env and default_model_path is not None:
             os.environ["CORTEXT_AIST_MODEL_PATH"] = default_model_path
+        if li_override is not None:
+            # The engine opens the raw variable; hand it the expanded path.
+            os.environ["CORTEXT_LI_MODEL_PATH"] = os.fspath(li_override)
         try:
             if self._provider_bridge is not None and self._object_provider_bridge is not None:
                 self._handle = self._lib.cortext_create_with_store_and_object_callbacks(
@@ -1173,6 +1177,8 @@ class Cortext:
                 os.environ.pop("CORTEXT_AIST_MODEL_PATH", None)
             elif previous_model_env is not None:
                 os.environ["CORTEXT_AIST_MODEL_PATH"] = previous_model_env
+            if previous_li_env is not None:
+                os.environ["CORTEXT_LI_MODEL_PATH"] = previous_li_env
         if not self._handle:
             _raise_last_error("cortext create failed")
 
