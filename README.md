@@ -14,8 +14,10 @@ pip install augmem.cortext==1.3.0
 uv pip install augmem.cortext==1.3.0
 ```
 
-The first `Cortext` instance downloads and verifies the AIST model and
-tokenizer. Set `CORTEXT_AIST_MODEL_PATH` to an existing GGUF for offline use.
+The first `Cortext` instance downloads and verifies the AIST model, its
+late-interaction reranker (`AIST-87M-LI.gguf`, placed beside the model) and the
+tokenizer. Set `CORTEXT_AIST_MODEL_PATH` to an existing GGUF for offline use,
+with `AIST-87M-LI.gguf` in the same directory or `CORTEXT_LI_MODEL_PATH` set.
 
 ## Install (GitHub Releases wheelhouse)
 
@@ -71,7 +73,18 @@ with cortext.Cortext(":memory:") as memory:
 ```
 
 For binary attachments, pass `Media(data, mimetype)` or raw bytes with
-`media_mimetype` to `process_text_with_media`.
+`media_mimetype` to `process_text_with_media` (or the audio / image
+`*_with_media` variants). The text is still what gets encoded; the media bytes
+are what the memory stores, under their MIME type. Empty media stores the
+canonical text. A payload is treated as text (keyword index, standing
+directives, evidence charged by its bytes) only when its MIME type is `text/*`.
+
+```python
+memory.process_text_with_media(
+    "Boarding pass for the ferry, gate B12.", "chat/pass",
+    cortext.Media(pdf_bytes, "application/pdf"),
+)
+```
 
 A query context leads with `standing_memory` (standing directives such as
 "Always ...", outside the retrieved ranking; show it ahead of
@@ -79,7 +92,7 @@ A query context leads with `standing_memory` (standing directives such as
 then `retrieved_memory`.
 
 Every `process_*` call takes `evidence_budget_bytes`: `None` (default) returns
-recalled memories whole; a positive byte count fits `standing_memory` plus
+recalled memories whole (there is no per-memory size cap); a positive byte count fits `standing_memory` plus
 `retrieved_memory` (with attached neighbours) within it, text counted by its
 UTF-8 bytes and other payloads as 480 bytes each. Grouped memories keep their
 members most similar to the query, and more distinct memories are kept
@@ -94,10 +107,30 @@ ctx = memory.process_text(
 evidence = ctx["standing_memory"] + ctx["retrieved_memory"]
 ```
 
+A query (`Retention.EPHEMERAL`) call also takes a reference time: keyword-only
+`reference_time`, an aware `datetime` or an `int` of milliseconds since the
+Unix epoch (past or future), and `as_of`. Unset, retrieval is unchanged. Set,
+the long-term memories nearest that time join the candidates; nothing is
+dropped for being later. With `as_of=True`, memories that start after the
+reference time are hidden ("what did I know then?"). `as_of` needs
+`reference_time`; naive datetimes are rejected. Other retentions ignore both.
+
+```python
+from datetime import datetime, timezone
+
+ctx = memory.process_text(
+    "Where was I staying?", "query/main",
+    retention=cortext.Retention.EPHEMERAL,
+    reference_time=datetime(2026, 3, 1, tzinfo=timezone.utc), as_of=True,
+)
+```
+
 Each memory in `standing_memory` / `retrieved_memory` / `working_memory` carries `content`: every
-signal payload of the memory as `{size_bytes, mimetype, base64}`, in signal
-order. `modality` is the modality its signals share, or `"mixed"` when they
-differ (for example a turn's text and the photo sent with it under one source).
+signal payload of the memory as `{size_bytes, mimetype, base64, timestamp}`, in
+signal order, where `timestamp` is that payload's time in ms (0 = unknown).
+`modality` is the modality its signals share, or `"mixed"` when they
+differ (for example a turn's text and the photo sent with it under one source);
+the memory's own `mimetype` is that of its first signal.
 
 Python 3.10+. Binding **1.3.0** tracks engine **v1.3.0**.
 
@@ -142,12 +175,18 @@ cortext/
 
 | Priority | Source |
 | --- | --- |
-| 1 | `CORTEXT_LIBRARY_PATH` / `CORTEXT_AIST_MODEL_PATH` |
+| 1 | `CORTEXT_LIBRARY_PATH` / `CORTEXT_AIST_MODEL_PATH` / `CORTEXT_LI_MODEL_PATH` |
 | 2 | `CORTEXT_ASSETS_DIR` |
 | 3 | Shipped package `native/` + `models/` (GitHub Release wheel) or verified model cache (PyPI wheel) |
 
 No sibling checkouts are searched. The PyPI wheel downloads only its pinned
 model assets when no explicit model path is provided.
+
+The late-interaction reranker resolves the way the engine looks for it:
+`CORTEXT_LI_MODEL_PATH`, else `AIST-87M-LI.gguf` beside the AIST model (the
+binding reassembles it there from the shipped chunks when the models manifest
+declares it, or downloads it on the PyPI path), else a reranker linked into the
+native library. `resolve_li_model()` returns the path that will be used.
 
 ## Environment (optional)
 
@@ -156,6 +195,7 @@ model assets when no explicit model path is provided.
 | `CORTEXT_LIBRARY_PATH` | Override shared library |
 | `CORTEXT_ASSETS_DIR` | Override entire assets root |
 | `CORTEXT_AIST_MODEL_PATH` | Full `.gguf` (skip materialize) |
+| `CORTEXT_LI_MODEL_PATH` | Late-interaction reranker `.gguf` (must exist when set) |
 | `CORTEXT_MODEL_CACHE_DIR` | Materialize cache directory |
 
 ## Maintainer release flow
@@ -190,14 +230,19 @@ gh release create v1.3.0 dist/wheels/*.whl dist/wheels/index.html \
 
 ## API
 
-- `Config`, `Media`, `Retention`, `Cortext`, `CortextError`
+- `Config`, `Media`, `Retention`, `ReferenceTime`, `Cortext`, `CortextError`
 - `version()`, `last_error()`, `load_library()`, `package_assets_ready()`
 - `process_*` / `embed_*` / `consolidate` / `flush` / `reset`
-- `materialize_model`, `resolve_aist_model`
+- `materialize_model`, `resolve_aist_model`, `resolve_li_model`
 
 ## Develop / test
 
 ```bash
 uv sync
+uv run pytest -q
+
+# Against a locally built engine
+CORTEXT_LIBRARY_PATH=/path/to/libcortext.dylib \
+CORTEXT_LI_MODEL_PATH=/path/to/AIST-87M-LI.gguf \
 uv run pytest -q
 ```
