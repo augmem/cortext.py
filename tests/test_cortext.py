@@ -377,6 +377,64 @@ def test_model_resolution_falls_back_to_verified_cache(monkeypatch, tmp_path):
     assert model.resolve_aist_model() == str(expected)
 
 
+def test_native_struct_layouts_match_capi():
+    """Mirrors of cortext_config / cortext_process_json_options (capi.h)."""
+    import ctypes
+
+    import cortext
+
+    config_fields = [name for name, _ in cortext._NativeConfig._fields_]
+    assert "procedural_enabled" not in config_fields
+    assert ctypes.sizeof(cortext._NativeConfig) == 64
+
+    options = cortext._NativeProcessJsonOptions
+    assert ctypes.sizeof(options) == 48
+    assert options.evidence_budget_bytes.offset == 24
+    assert options.has_reference_ms.offset == 32
+    assert options.as_of.offset == 36
+    assert options.reference_ms.offset == 40
+
+
+def test_process_json_options_carry_the_reference_time():
+    from datetime import datetime, timedelta, timezone
+
+    import cortext
+
+    unset = cortext._native_process_json_options(True)
+    assert (unset.has_reference_ms, unset.as_of, unset.reference_ms) == (0, 0, 0)
+
+    at_ms = cortext._native_process_json_options(
+        True, cortext.Retention.EPHEMERAL, reference_time=1_700_000_000_123
+    )
+    assert (at_ms.has_reference_ms, at_ms.as_of, at_ms.reference_ms) == (
+        1, 0, 1_700_000_000_123
+    )
+
+    moment = datetime(2023, 11, 14, 22, 13, 20, 123000, tzinfo=timezone.utc)
+    as_of = cortext._native_process_json_options(
+        True, cortext.Retention.EPHEMERAL, reference_time=moment, as_of=True
+    )
+    assert (as_of.has_reference_ms, as_of.as_of, as_of.reference_ms) == (
+        1, 1, 1_700_000_000_123
+    )
+    offset = moment.astimezone(timezone(timedelta(hours=-5)))
+    assert (
+        cortext._native_process_json_options(True, reference_time=offset).reference_ms
+        == 1_700_000_000_123
+    )
+
+    with pytest.raises(ValueError):
+        cortext._native_process_json_options(True, as_of=True)
+    with pytest.raises(ValueError):
+        cortext._native_process_json_options(True, reference_time=-1)
+    with pytest.raises(ValueError):
+        cortext._native_process_json_options(
+            True, reference_time=datetime(2023, 11, 14)
+        )
+    with pytest.raises(TypeError):
+        cortext._native_process_json_options(True, reference_time=1.5)
+    with pytest.raises(TypeError):
+        cortext._native_process_json_options(True, reference_time=True)
 
 
 def _store_ferry_timetable(engine):
@@ -393,6 +451,52 @@ def _store_ferry_timetable(engine):
             retention=cortext.Retention.DURABLE,
         )
 
+
+def test_reference_time_with_and_without_as_of(tmp_path):
+    from datetime import datetime, timedelta, timezone
+
+    import cortext
+    from cortext.model import clear_materialize_cache
+
+    os.environ["CORTEXT_MODEL_CACHE_DIR"] = str(tmp_path / "engine-cache-reftime")
+    clear_materialize_cache()
+    query = "When does the ferry leave?"
+    try:
+        with cortext.Cortext(str(tmp_path / "reftime.db")) as engine:
+            stored_at = datetime.now(timezone.utc)
+            _store_ferry_timetable(engine)
+            before = stored_at - timedelta(days=1)
+            after = datetime.now(timezone.utc) + timedelta(days=1)
+
+            def ask(**kwargs):
+                return engine.process_text(
+                    query, "query/public",
+                    retention=cortext.Retention.EPHEMERAL, **kwargs,
+                )
+
+            unchanged = ask()
+            past = ask(reference_time=before)
+            past_as_of = ask(reference_time=before, as_of=True)
+            future_as_of = ask(reference_time=after, as_of=True)
+            past_ms_as_of = ask(
+                reference_time=int(before.timestamp() * 1000), as_of=True
+            )
+
+        assert unchanged["retrieved_memory"]
+        assert unchanged["standing_memory"]
+        # A reference time alone only adds candidates near it.
+        assert past["retrieved_memory"]
+        # As of a moment before anything was stored, nothing is visible yet.
+        assert past_as_of["retrieved_memory"] == []
+        assert past_as_of["standing_memory"] == []
+        assert past_ms_as_of["retrieved_memory"] == []
+        # As of a later moment, everything stored so far is visible.
+        assert {m["id"] for m in future_as_of["retrieved_memory"]} == {
+            m["id"] for m in unchanged["retrieved_memory"]
+        }
+    finally:
+        os.environ.pop("CORTEXT_MODEL_CACHE_DIR", None)
+        clear_materialize_cache()
 
 
 def test_content_entries_carry_their_timestamps(tmp_path):
