@@ -12,17 +12,18 @@ _PKG = _WORKSPACE / "cortext"
 
 @pytest.fixture(scope="module", autouse=True)
 def _clear_override_env():
-    """Shipped path must work without CORTEXT_ASSETS_DIR."""
+    """Shipped path must work without CORTEXT_ASSETS_DIR.
+
+    ``CORTEXT_LIBRARY_PATH`` is kept: it is how a maintainer points the suite
+    at a locally built engine (it wins over the shipped native).
+    """
     prev_assets = os.environ.pop("CORTEXT_ASSETS_DIR", None)
-    prev_lib = os.environ.pop("CORTEXT_LIBRARY_PATH", None)
     import cortext as ct
 
     ct._LIB = None  # type: ignore[attr-defined]
     yield
     if prev_assets is not None:
         os.environ["CORTEXT_ASSETS_DIR"] = prev_assets
-    if prev_lib is not None:
-        os.environ["CORTEXT_LIBRARY_PATH"] = prev_lib
     ct._LIB = None  # type: ignore[attr-defined]
 
 
@@ -374,3 +375,141 @@ def test_model_resolution_falls_back_to_verified_cache(monkeypatch, tmp_path):
     monkeypatch.setattr(model, "_remote_model_path", lambda _cache: str(expected))
 
     assert model.resolve_aist_model() == str(expected)
+
+
+
+
+def _store_ferry_timetable(engine):
+    import cortext
+
+    engine.process_text(
+        "Always answer with the departure pier.", "chat/rules",
+        retention=cortext.Retention.DURABLE,
+    )
+    for i in range(3):
+        engine.process_text(
+            f"The ferry to the island leaves at {6 + i} from pier four.",
+            f"chat/ferry/{i}",
+            retention=cortext.Retention.DURABLE,
+        )
+
+
+
+def test_content_entries_carry_their_timestamps(tmp_path):
+    import time
+
+    import cortext
+    from cortext.model import clear_materialize_cache
+
+    os.environ["CORTEXT_MODEL_CACHE_DIR"] = str(tmp_path / "engine-cache-ts")
+    clear_materialize_cache()
+    try:
+        with cortext.Cortext(str(tmp_path / "ts.db")) as engine:
+            start_ms = int(time.time() * 1000)
+            _store_ferry_timetable(engine)
+            end_ms = int(time.time() * 1000)
+            ctx = engine.process_text(
+                "When does the ferry leave?", "query/public",
+                retention=cortext.Retention.EPHEMERAL,
+            )
+        memories = ctx["standing_memory"] + ctx["retrieved_memory"]
+        assert memories
+        for memory in memories:
+            assert memory["content"]
+            for entry in memory["content"]:
+                assert isinstance(entry["timestamp"], int)
+                assert start_ms <= entry["timestamp"] <= end_ms
+    finally:
+        os.environ.pop("CORTEXT_MODEL_CACHE_DIR", None)
+        clear_materialize_cache()
+
+
+def test_standing_memory_is_separate_from_retrieved(tmp_path):
+    import base64
+
+    import cortext
+    from cortext.model import clear_materialize_cache
+
+    os.environ["CORTEXT_MODEL_CACHE_DIR"] = str(tmp_path / "engine-cache-standing")
+    clear_materialize_cache()
+    directive = "Always answer with the departure pier."
+    try:
+        with cortext.Cortext(str(tmp_path / "standing.db")) as engine:
+            _store_ferry_timetable(engine)
+            ctx = engine.process_text(
+                "When does the ferry leave?", "query/public",
+                retention=cortext.Retention.EPHEMERAL,
+            )
+
+        def texts(memories):
+            return [
+                base64.b64decode(c["base64"]).decode("utf-8")
+                for m in memories
+                for c in m["content"]
+            ]
+
+        # Standing directives come back in their own block, which holds only
+        # the signals that state a directive (never the plain facts).
+        assert texts(ctx["standing_memory"]) == [directive]
+        assert any("ferry" in t for t in texts(ctx["retrieved_memory"]))
+    finally:
+        os.environ.pop("CORTEXT_MODEL_CACHE_DIR", None)
+        clear_materialize_cache()
+
+
+def test_text_with_media_stores_caller_bytes_or_canonical_text(tmp_path):
+    import base64
+
+    import cortext
+    from cortext.model import clear_materialize_cache
+
+    os.environ["CORTEXT_MODEL_CACHE_DIR"] = str(tmp_path / "engine-cache-media")
+    clear_materialize_cache()
+    pdf = b"%PDF-1.7 fake boarding pass"
+    markdown = "# Boarding\n\nGate **B12** for the ferry to the island."
+    try:
+        with cortext.Cortext(str(tmp_path / "media.db")) as engine:
+            engine.process_text_with_media(
+                "Boarding pass for the ferry to the island, gate B12.",
+                "chat/pass",
+                cortext.Media(pdf, "application/pdf"),
+                retention=cortext.Retention.DURABLE,
+            )
+            engine.process_text_with_media(
+                "The ferry snack bar opens at noon.",
+                "chat/snacks",
+                b"",
+                retention=cortext.Retention.DURABLE,
+            )
+            engine.process_text_with_media(
+                "Boarding notes for the island ferry gate.",
+                "chat/notes",
+                markdown.encode("utf-8"),
+                "text/markdown",
+                retention=cortext.Retention.DURABLE,
+                evidence_budget_bytes=None,
+            )
+            ctx = engine.process_text(
+                "ferry island boarding gate snack bar", "query/public",
+                retention=cortext.Retention.EPHEMERAL,
+            )
+        by_source = {
+            m["source_id"]: m["content"]
+            for m in ctx["retrieved_memory"] + ctx["working_memory"]
+        }
+        assert {"chat/pass", "chat/snacks", "chat/notes"} <= set(by_source)
+        (pass_entry,) = by_source["chat/pass"]
+        assert pass_entry["mimetype"] == "application/pdf"
+        assert base64.b64decode(pass_entry["base64"]) == pdf
+        (snack_entry,) = by_source["chat/snacks"]
+        assert snack_entry["mimetype"].startswith("text/plain")
+        assert (
+            base64.b64decode(snack_entry["base64"]).decode("utf-8")
+            == "The ferry snack bar opens at noon."
+        )
+        (notes_entry,) = by_source["chat/notes"]
+        assert notes_entry["mimetype"] == "text/markdown"
+        assert base64.b64decode(notes_entry["base64"]).decode("utf-8") == markdown
+    finally:
+        os.environ.pop("CORTEXT_MODEL_CACHE_DIR", None)
+        clear_materialize_cache()
