@@ -61,7 +61,7 @@ def engine_v5(tmp_path_factory):
         clear_materialize_cache()
     supported = (
         "standing_memory" in now
-        and bool(now["retrieved_memory"])
+        and bool(now.get("retrieved_memory"))
         and all(
             "timestamp" in c for m in now["retrieved_memory"] for c in m["content"]
         )
